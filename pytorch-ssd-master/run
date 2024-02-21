@@ -1,0 +1,17 @@
+#!/bin/bash
+#SBATCH --job-name=train_vgg              # Название задачи
+#SBATCH --error=train_vgg-%j.err          # Файл для вывода ошибок
+#SBATCH --output=train_vgg-%j.log         # Файл для вывода результатов
+#SBATCH --time=20:00:00              # Максимальное время выполнения
+#SBATCH --ntasks=1                   # Количество MPI процессов
+#SBATCH --nodes=1                    # Требуемое кол-во узлов
+#SBATCH --cpus-per-task=8       # Количество ядер CPU, выделенных для одного процесса
+#SBATCH --gpus 1                     # Требуемое кол-во GPU
+#SBATCH -A proj_1466
+
+module purge
+module load Python
+source deactivate
+source activate retinanet
+
+python -u train_vgg.py
