@@ -11,10 +11,9 @@ import torchvision.transforms as T
 from torchvision.utils import make_grid 
 from torch.utils.data import DataLoader
 
-from utils.datasetLLAD import LLAD
-from utils.dataloader import collater, collater2, ToTorch, Augmenter, Normalizer, UnNormalizer, AddDim, collater_mosaic
-from unet import UNet
-# from metric import iou, pix_acc
+from utils.datasetLADD import LADD
+from utils.dataloader import collater_mask,  ToTorch, Augmenter, Normalizer
+from unet_model import unet
 from metrics import calculate_semantic_metrics, iou_pytorch, dice_pytorch
 
 
@@ -26,7 +25,7 @@ test_df = [{'dataframe': pd.read_csv('/home/maantonov_1/VKR/data/main_data/test/
              'image_dir': '/home/maantonov_1/VKR/data/main_data/test/images'}]
 
 
-test_dataset = LLAD(test_df, mode = "valid", class_mask=True, smart_crop = True, new_shape = (2048,2048), transforms = T.Compose([Normalizer(), ToTorch()]))
+test_dataset = LADD(test_df, mode = "valid", class_mask=True, smart_crop = True, new_shape = (2048,2048), transforms = T.Compose([Normalizer(), ToTorch()]))
 
 
 print(f'dataset Created', flush=True)
@@ -37,11 +36,11 @@ torch.cuda.empty_cache()
 print('CUDA available: {}'.format(torch.cuda.is_available()), flush=True)
 print(f'Crreating retinanet ===>', flush=True)
 
+path_to_weights = '/home/maantonov_1/VKR/weights/unet/cross/unet_iou_full_data28_0.08224978379723502.pt'
 
+model = unet.UNet()
 
-model = UNet()
-
-model.load_state_dict(torch.load('/home/maantonov_1/VKR/actual_scripts/UNet-PyTorch/unet_iou_26_0.07548326443184197.pt').state_dict())
+model.load_state_dict(torch.load(path_to_weights).state_dict())
 
 
 # if torch.cuda.is_available():

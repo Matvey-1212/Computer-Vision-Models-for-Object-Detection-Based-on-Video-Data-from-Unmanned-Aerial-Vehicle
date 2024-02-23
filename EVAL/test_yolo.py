@@ -5,10 +5,12 @@ import pandas as pd
 import cv2
 
 import torch
-from utils.datasetLLAD import LLAD
+from ultralytics import YOLO
+
+from utils.datasetLADD import LADD
 from metrics import evaluate
 
-from ultralytics import YOLO
+
 
 
 
@@ -16,7 +18,7 @@ test_df = [{'dataframe': pd.read_csv('/home/maantonov_1/VKR/data/main_data/test/
              'image_dir': '/home/maantonov_1/VKR/data/main_data/test/images'}]
 
 
-test_dataset = LLAD(test_df, mode = "valid", from_255_to_1 = False, class_mask=False, smart_crop = True, new_shape = (640,640))
+test_dataset = LLAD(test_df, mode = "valid", from_255_to_1 = False, smart_crop = True, new_shape = (640,640))
 
 torch.cuda.empty_cache()
 

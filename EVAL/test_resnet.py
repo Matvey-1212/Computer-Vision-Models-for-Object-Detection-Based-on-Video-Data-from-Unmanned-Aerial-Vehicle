@@ -11,10 +11,10 @@ import torchvision.transforms as T
 from torchvision.utils import make_grid 
 from torch.utils.data import DataLoader
 
-from utils.datasetLLAD import LLAD
-from utils.dataloader import collater, collater2, ToTorch, Augmenter, Normalizer, UnNormalizer, AddDim, collater_mosaic
-import OAN
-# from metric import iou, pix_acc
+from utils.datasetLADD import LADD
+from utils.dataloader import collater_mask, ToTorch, Augmenter, Normalizer
+from oan import OAN
+
 from metrics import calculate_semantic_metrics, iou_pytorch, dice_pytorch
 
 
@@ -26,7 +26,7 @@ test_df = [{'dataframe': pd.read_csv('/home/maantonov_1/VKR/data/main_data/test/
              'image_dir': '/home/maantonov_1/VKR/data/main_data/test/images'}]
 
 
-test_dataset = LLAD(test_df, mode = "valid", small_class_mask=True, smart_crop = True, new_shape = (1024,1024), transforms = T.Compose([Normalizer(), ToTorch()]))
+test_dataset = LADD(test_df, mode = "valid", small_class_mask=True, smart_crop = True, new_shape = (1024,1024), transforms = T.Compose([Normalizer(), ToTorch()]))
 
 
 print(f'dataset Created', flush=True)
@@ -37,11 +37,11 @@ torch.cuda.empty_cache()
 print('CUDA available: {}'.format(torch.cuda.is_available()), flush=True)
 print(f'Crreating retinanet ===>', flush=True)
 
-
+path_to_weights = '/home/maantonov_1/VKR/weights/resnet_oan/resnet_oan_main3_26_0.06251720879827777.pt'
 
 model = OAN.OAN();
 
-model.load_state_dict(torch.load('/home/maantonov_1/VKR/actual_scripts/resnet encoder/resnet_oan_main3_27_0.05811988045611689.pt').state_dict())
+model.load_state_dict(torch.load(path_to_weights).state_dict())
 
 
 # if torch.cuda.is_available():

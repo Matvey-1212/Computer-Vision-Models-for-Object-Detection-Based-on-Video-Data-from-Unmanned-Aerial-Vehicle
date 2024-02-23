@@ -3,44 +3,26 @@ import time
 import numpy as np
 import pandas as pd
 
-import wandb
 import torch
 import torch.optim as optim
 import torchvision.transforms as T
 from torchvision.utils import make_grid 
 from torch.utils.data import DataLoader
 
-from utils.datasetLLAD import LLAD
-from utils.dataloader import collater, collater2, ToTorch, Augmenter, Normalizer, UnNormalizer, AddDim, collater_mosaic
+from utils.datasetLADD import LADD
+from utils.dataloader import ToTorch, Augmenter, Normalizer
 from retinanet import model
 from metrics import evaluate
 
-# import torch.autograd
-# torch.autograd.set_detect_anomaly(True)
-
-
-
-
-# os.environ["WANDB_MODE"]="offline" 
-# wandb.init(project="VKR", entity="matvey_antonov")
 
 
 test_df = [{'dataframe': pd.read_csv('/home/maantonov_1/VKR/data/main_data/test/test_main.csv'),
              'image_dir': '/home/maantonov_1/VKR/data/main_data/test/images'}]
 
 
-test_dataset = LLAD(test_df, mode = "valid", smart_crop = True, new_shape = (640,640), transforms = T.Compose([Normalizer(), ToTorch()]))
+test_dataset = LADD(test_df, mode = "valid", smart_crop = True, new_shape = (640,640), transforms = T.Compose([Normalizer(), ToTorch()]))
 
 print(f'dataset Created', flush=True)
-
-# DataLoaders
-# test_data_loader = DataLoader(
-#     train_dataset,
-#     batch_size = 1,
-#     shuffle = True,
-#     num_workers = 4,
-#     collate_fn = collater
-# )
 
 
 device = torch.device('cuda') if torch.cuda.is_available() else torch.device('cpu')
@@ -48,23 +30,16 @@ torch.cuda.empty_cache()
 print('CUDA available: {}'.format(torch.cuda.is_available()), flush=True)
 print(f'Crreating retinanet ===>', flush=True)
 
+path_to_weights = '/home/maantonov_1/VKR/actual_scripts/retinanet_sep/temp_weights_retina/retinanet_only_19_0.2869687195747129.pt'
 
-# model = UNet(n_classes=2)
+retinanet = torch.load(path_to_weights, map_location=device)
 
-retinanet = torch.load('/home/maantonov_1/VKR/actual_scripts/retinanet_sep/temp_weights_retina/retinanet_only_20_0.7984588184664326.pt', map_location=device)
-
-# retinanet = retinanet.cuda()
 if torch.cuda.is_available():
     retinanet = torch.nn.DataParallel(retinanet).cuda()
 
 
 retinanet.training = False
 retinanet.eval()
-# retinanet.module.freeze_bn()
-
-
-# model.to(device)
-# model.eval()
 
 # [({'boxes': np.array([[1321.8750,  274.6667, 1348.8750,  312.6667]]),
 #                 'labels': np.array([1])},

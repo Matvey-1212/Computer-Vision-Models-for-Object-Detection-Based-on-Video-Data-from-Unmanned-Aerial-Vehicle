@@ -1,7 +1,7 @@
 #!/bin/bash
-#SBATCH --job-name=test              # Название задачи
-#SBATCH --error=test-%j.err          # Файл для вывода ошибок
-#SBATCH --output=test-%j.log         # Файл для вывода результатов
+#SBATCH --job-name=resnet_test              # Название задачи
+#SBATCH --error=resnet_test-%j.err          # Файл для вывода ошибок
+#SBATCH --output=resnet_test-%j.log         # Файл для вывода результатов
 #SBATCH --time=20:00:00              # Максимальное время выполнения
 #SBATCH --ntasks=1                   # Количество MPI процессов
 #SBATCH --nodes=1                    # Требуемое кол-во узлов
@@ -17,4 +17,4 @@ source deactivate
 source activate retinanet
 
 
-python -u test_unet.py
+python -u test_resnet.py
