@@ -19,7 +19,7 @@ class LLAD(Dataset):
         self.dataframes_list = []
         for data in dataframes_list:
             dataset = {}
-            dataset['image_ids'] = data['dataframe']['id']
+            dataset['image_ids'] = data['dataframe']['id'] if smart_crop else data['dataframe']['id'].unique()
             dataset['image_lab'] = data['dataframe'][['x', 'y', 'w', 'h','class','width','height']]
             dataset['df']        = data['dataframe']
             dataset['image_dir'] = data['image_dir']
@@ -194,10 +194,10 @@ class LLAD(Dataset):
         # Retriving image id and records from df
         count = 0
         for data in self.dataframes_list:
-            count += data['df'].shape[0]
+            count += data['image_ids'].shape[0]
             if index < count:
                 current_data = data
-                count -= data['df'].shape[0]
+                count -= data['image_ids'].shape[0]
                 break
                 
         

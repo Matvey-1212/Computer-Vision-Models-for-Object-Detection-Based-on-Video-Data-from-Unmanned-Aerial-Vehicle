@@ -24,15 +24,13 @@ wandb.init(project="VKR", entity="matvey_antonov", name = "unet_iou_full_data")
 # import torch.autograd
 # torch.autograd.set_detect_anomaly(True)
 
-local_transform = A.Compose([
-    A.HorizontalFlip(p=0.5),  # Случайное отражение по горизонтали с вероятностью 0.5
-    A.VerticalFlip(p=0.5),  # Случайное отражение по вертикали с вероятностью 0.5
-    A.RandomBrightnessContrast(p=0.2),  # Случайное изменение яркости/контрастности с вероятностью 0.2ы
+local_transform = A.Compose([ # flip inside augmenter
+    # A.RandomBrightnessContrast(p=0.2),  # Случайное изменение яркости/контрастности с вероятностью 0.2ы
     A.GaussNoise(p=0.1),  # Добавление гауссовского шума с вероятностью 0.1
     
     # Цветовые аугментации
     A.ColorJitter(brightness=0.2, contrast=0.2, saturation=0.2, hue=0.2, p=0.3),  # Случайное изменение яркости, контраста, насыщенности и оттенка
-    A.HueSaturationValue(hue_shift_limit=20, sat_shift_limit=30, val_shift_limit=20, p=0.3),  # Изменение оттенка, насыщенности и яркости
+    # A.HueSaturationValue(hue_shift_limit=20, sat_shift_limit=30, val_shift_limit=20, p=0.3),  # Изменение оттенка, насыщенности и яркости
 ])
 
 
@@ -57,7 +55,7 @@ print(f'dataset Created', flush=True)
 # DataLoaders
 train_data_loader = DataLoader(
     train_dataset,
-    batch_size = 8,
+    batch_size = 32,
     shuffle = True,
     num_workers = 8,
     collate_fn = collater
@@ -65,7 +63,7 @@ train_data_loader = DataLoader(
 
 valid_data_loader = DataLoader(
     valid_dataset,
-    batch_size = 8,
+    batch_size = 32,
     shuffle = True,
     num_workers = 8,
     collate_fn = collater
@@ -82,14 +80,14 @@ print(f'Crreating retinanet ===>', flush=True)
 
 model = UNet(n_classes=2)
 
-optimizer = torch.optim.Adam(model.parameters(), lr = 0.0003)
+optimizer = torch.optim.Adam(model.parameters(), lr = 0.0005)
 criterion = Weighted_Cross_Entropy_Loss()
 
 # Learning Rate Scheduler
-# lr_scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size = 7, gamma=0.5)
-lr_scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
-    optimizer, factor=0.5, patience=5, verbose=True
-)
+lr_scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size = 5, gamma=0.5)
+# lr_scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
+#     optimizer, factor=0.5, patience=5, verbose=True
+# )
 
 
 model.to(device)
@@ -111,7 +109,7 @@ def train_one_epoch(epoch_num, train_data_loader):
         # Reseting gradients after each iter
         optimizer.zero_grad()
         
-        img, mask = data['img'].cuda().float(), data['mask'].cuda().long()
+        img, mask = data['img'].to(device).float(), data['mask'].to(device).long()
         
         # img = oan(img)
         
@@ -142,8 +140,8 @@ def train_one_epoch(epoch_num, train_data_loader):
         del loss
         
     # Update the learning rate
-    #if lr_scheduler is not None:
-        #lr_scheduler.step()
+    if lr_scheduler is not None:
+        lr_scheduler.step()
         
     et = time.time()
     print("\n Total Time - {}\n".format(int(et - st)))
@@ -163,7 +161,7 @@ def valid_one_epoch(epoch_num, valid_data_loader):
         with torch.no_grad():
             
             # Forward
-            img, mask = data['img'].cuda().float(), data['mask'].cuda().long()
+            img, mask = data['img'].to(device).float(), data['mask'].to(device).long()
         
             pred = model(img)
             loss = criterion(pred, mask)
@@ -180,10 +178,10 @@ def valid_one_epoch(epoch_num, valid_data_loader):
     et = time.time()
     print("\n Total Time - {}\n".format(int(et - st)))
     
-    lr_scheduler.step(np.mean(epoch_loss))
+    # lr_scheduler.step(np.mean(epoch_loss))
     
     # Save Model after each epoch
-    torch.save(model, f"unet_iou_full_data{epoch_num}_{np.mean(epoch_loss)}.pt")
+    torch.save(model, f"unet_iou_full_data_step_5{epoch_num}_{np.mean(epoch_loss)}.pt")
     return np.mean(epoch_loss)
     
     

@@ -25,33 +25,29 @@ import albumentations as A
 # import torch.autograd
 # torch.autograd.set_detect_anomaly(True)
 
-local_transform = A.Compose([
-    A.HorizontalFlip(p=0.5),  # Случайное отражение по горизонтали с вероятностью 0.5
-    A.VerticalFlip(p=0.5),  # Случайное отражение по вертикали с вероятностью 0.5
-    A.RandomBrightnessContrast(p=0.2),  # Случайное изменение яркости/контрастности с вероятностью 0.2ы
-    A.ElasticTransform(alpha=1, sigma=50, alpha_affine=50, p=0.2),  # Эластичное искажение с вероятностью 0.5
+local_transform = A.Compose([ # flip inside augmenter
+    # A.RandomBrightnessContrast(p=0.2),  # Случайное изменение яркости/контрастности с вероятностью 0.2ы
     A.GaussNoise(p=0.1),  # Добавление гауссовского шума с вероятностью 0.1
     
     # Цветовые аугментации
     A.ColorJitter(brightness=0.2, contrast=0.2, saturation=0.2, hue=0.2, p=0.3),  # Случайное изменение яркости, контраста, насыщенности и оттенка
-    A.HueSaturationValue(hue_shift_limit=20, sat_shift_limit=30, val_shift_limit=20, p=0.3),  # Изменение оттенка, насыщенности и яркости
+    # A.HueSaturationValue(hue_shift_limit=20, sat_shift_limit=30, val_shift_limit=20, p=0.3),  # Изменение оттенка, насыщенности и яркости
 ])
 
 
 
 os.environ["WANDB_MODE"]="offline" 
-wandb.init(project="VKR", entity="matvey_antonov", name = "just_retina_main_640_2")
+wandb.init(project="VKR", entity="matvey_antonov", name = "just_retina_full_640_step_7")
 
-train_df = [{'dataframe': pd.read_csv('/home/maantonov_1/VKR/data/main_data/train/main_train.csv'),
-             'image_dir': '/home/maantonov_1/VKR/data/main_data/train/images'}]
-            # ,
-            # {'dataframe': pd.read_csv('/home/maantonov_1/VKR/data/small_train/crop_train/croped_small_train.csv'),
-            #  'image_dir': '/home/maantonov_1/VKR/data/small_train/crop_train/images'}]
+train_df = [{'dataframe': pd.read_csv('/home/maantonov_1/VKR/data/main_data/crop_train/croped_main_train.csv'),
+             'image_dir': '/home/maantonov_1/VKR/data/main_data/crop_train/images'},
+            {'dataframe': pd.read_csv('/home/maantonov_1/VKR/data/small_train/full_crop_train/croped_small_train.csv'),
+             'image_dir': '/home/maantonov_1/VKR/data/small_train/full_crop_train/images'}]
 
-valid_df = [{'dataframe': pd.read_csv('/home/maantonov_1/VKR/data/main_data/train/main_val.csv'),
-             'image_dir': '/home/maantonov_1/VKR/data/main_data/train/images'}]
+valid_df = [{'dataframe': pd.read_csv('/home/maantonov_1/VKR/data/main_data/crop_val/croped_val.csv'),
+             'image_dir': '/home/maantonov_1/VKR/data/main_data/crop_val/images'}]
 
-train_dataset = LLAD(train_df, mode = "train", transforms = T.Compose([Normalizer(), ToTorch()]))
+train_dataset = LLAD(train_df, mode = "train", transforms = T.Compose([Augmenter(local_transform), Normalizer(), ToTorch()]))
 valid_dataset = LLAD(valid_df, mode = "valid", transforms = T.Compose([Normalizer(), ToTorch()]))
 
 
@@ -61,17 +57,17 @@ print(f'dataset Created', flush=True)
 # DataLoaders
 train_data_loader = DataLoader(
     train_dataset,
-    batch_size = 1,
+    batch_size = 32,
     shuffle = True,
-    num_workers = 4,
+    num_workers = 8,
     collate_fn = collater_annot
 )
 
 valid_data_loader = DataLoader(
     valid_dataset,
-    batch_size = 1,
+    batch_size = 32,
     shuffle = True,
-    num_workers = 4,
+    num_workers = 8,
     collate_fn = collater_annot
 )
 
@@ -86,8 +82,9 @@ print(f'Crreating retinanet ===>', flush=True)
 
 retinanet = model.resnet50(num_classes = 1, pretrained = False, inputs = 3)
 
-optimizer = optim.Adam(retinanet.parameters(), lr=0.0003)
-# scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimizer, patience=5, verbose=True)
+optimizer = optim.Adam(retinanet.parameters(), lr=0.0005)
+lr_scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size = 5, gamma=0.5)
+# scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimizer, patience=7, verbose=True)
 
 retinanet.to(device)
 
@@ -107,17 +104,12 @@ def train_one_epoch(epoch_num, train_data_loader):
 
     for iter_num, data in enumerate(train_data_loader):
                 
-        # Reseting gradients after each iter
         optimizer.zero_grad()
         
         img, annot = data['img'].cuda().float(), data['annot'].cuda().float()
         
-        # for i in range(img.shape[0]):
-        #     img[i] = transforms_list(img[i])
-        
         classification_loss, regression_loss = retinanet([img, annot])
                 
-        # Calculating Loss
         classification_loss = classification_loss.mean()
         regression_loss = regression_loss.mean()
         
@@ -128,16 +120,11 @@ def train_one_epoch(epoch_num, train_data_loader):
         if bool(loss == 0):
             continue
                 
-        # Calculating Gradients
         loss.backward()
 
-        # Gradient Clipping
         torch.nn.utils.clip_grad_norm_(retinanet.parameters(), 0.1)
                 
-        # Updating Weights
         optimizer.step()
-
-        #Epoch Loss
         epoch_loss.append(float(loss))
 
             
@@ -149,8 +136,8 @@ def train_one_epoch(epoch_num, train_data_loader):
         del regression_loss
         
     # Update the learning rate
-    # if scheduler is not None:
-    #     scheduler.step(np.mean(epoch_loss))
+    if lr_scheduler is not None:
+        lr_scheduler.step()
         
     et = time.time()
     print("\n Total Time - {}\n".format(int(et - st)))
@@ -175,14 +162,12 @@ def valid_one_epoch(epoch_num, valid_data_loader):
         
             classification_loss, regression_loss = retinanet([img, annot])
                     
-            # Calculating Loss
             classification_loss = classification_loss.mean()
             regression_loss = regression_loss.mean()
             
 
             loss = classification_loss + regression_loss
 
-            #Epoch Loss
             epoch_loss.append(float(loss))
 
             print(
@@ -195,11 +180,8 @@ def valid_one_epoch(epoch_num, valid_data_loader):
     et = time.time()
     print("\n Total Time - {}\n".format(int(et - st)))
     
-    # if scheduler is not None:
-    #     scheduler.step(np.mean(epoch_loss))
-    
-    # Save Model after each epoch
-    torch.save(retinanet, f"/home/maantonov_1/VKR/actual_scripts/retinanet_sep/temp_weights_retina/retinanet_2_only_{epoch_num}_{np.mean(epoch_loss)}.pt")
+
+    torch.save(retinanet, f"/home/maantonov_1/VKR/actual_scripts/retinanet_sep/temp_weights_retina/retinanet_only_{epoch_num}_{np.mean(epoch_loss)}.pt")
     return np.mean(epoch_loss)
     
     
