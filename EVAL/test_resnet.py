@@ -13,7 +13,7 @@ from torch.utils.data import DataLoader
 
 from utils.datasetLADD import LADD
 from utils.dataloader import collater_mask, ToTorch, Augmenter, Normalizer
-from oan import OAN
+from oan.model import OAN
 
 from metrics import calculate_semantic_metrics, iou_pytorch, dice_pytorch
 
@@ -26,7 +26,7 @@ test_df = [{'dataframe': pd.read_csv('/home/maantonov_1/VKR/data/main_data/test/
              'image_dir': '/home/maantonov_1/VKR/data/main_data/test/images'}]
 
 
-test_dataset = LADD(test_df, mode = "valid", small_class_mask=True, smart_crop = True, new_shape = (1024,1024), transforms = T.Compose([Normalizer(), ToTorch()]))
+test_dataset = LADD(test_df, mode = "valid", small_class_mask=True, smart_crop = True, new_shape = (2048,2048), transforms = T.Compose([Normalizer(), ToTorch()]))
 
 
 print(f'dataset Created', flush=True)
@@ -37,11 +37,11 @@ torch.cuda.empty_cache()
 print('CUDA available: {}'.format(torch.cuda.is_available()), flush=True)
 print(f'Crreating retinanet ===>', flush=True)
 
-path_to_weights = '/home/maantonov_1/VKR/weights/resnet_oan/resnet_oan_main3_26_0.06251720879827777.pt'
+path_to_weights = '/home/maantonov_1/VKR/weights/resnet_oan/23_02_2024/2_resnet_oan_main_full_step_10_25_0.061048789250273856.pt'
 
-model = OAN.OAN();
+# model = OAN.OAN();
 
-model.load_state_dict(torch.load(path_to_weights).state_dict())
+model = torch.load(path_to_weights)
 
 
 # if torch.cuda.is_available():
@@ -61,6 +61,8 @@ recall_mean = []
 f1_mean = []
 iou = []
 dice = []
+
+f_coef = 0.5
 
 for i in range(len(test_dataset)):
     print(f'{i} / {len(test_dataset)}')
@@ -87,7 +89,7 @@ for i in range(len(test_dataset)):
         # torch.save(mask, f'/home/maantonov_1/VKR/actual_scripts/EVAL/pred_img/mask{i}.pt')
         # torch.save(img, f'/home/maantonov_1/VKR/actual_scripts/EVAL/pred_img/img{i}.pt')
         
-        accuracy, precision, recall, f1 = calculate_semantic_metrics(pred, mask)
+        accuracy, precision, recall, f1 = calculate_semantic_metrics(pred, mask, f_coef = f_coef)
         
         accuracy_mean.append(accuracy)
         precision_mean.append(precision)
@@ -105,6 +107,6 @@ for i in range(len(test_dataset)):
 print(f'Accuracy: {np.mean(accuracy_mean)}')
 print(f'Precision: {np.mean(precision_mean)}')
 print(f'Recall: {np.mean(recall_mean)}')
-print(f'F1 Score: {np.mean(f1_mean)}')
+print(f'F{f_coef} Score: {np.mean(f1_mean)}')
 print(f'iou: {np.mean(iou)}')
 print(f'dice: {np.mean(dice)}')

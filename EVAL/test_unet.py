@@ -13,7 +13,7 @@ from torch.utils.data import DataLoader
 
 from utils.datasetLADD import LADD
 from utils.dataloader import collater_mask,  ToTorch, Augmenter, Normalizer
-from unet_model import unet
+from unet.model import UNet
 from metrics import calculate_semantic_metrics, iou_pytorch, dice_pytorch
 
 
@@ -36,11 +36,10 @@ torch.cuda.empty_cache()
 print('CUDA available: {}'.format(torch.cuda.is_available()), flush=True)
 print(f'Crreating retinanet ===>', flush=True)
 
-path_to_weights = '/home/maantonov_1/VKR/weights/unet/cross/unet_iou_full_data28_0.08224978379723502.pt'
+path_to_weights = '/home/maantonov_1/VKR/weights/unet/cross/23_02_2024/2_unet_wce_full_data_step_10_28_0.054158349059645304.pt'
 
-model = unet.UNet()
 
-model.load_state_dict(torch.load(path_to_weights).state_dict())
+model = torch.load(path_to_weights)
 
 
 # if torch.cuda.is_available():
@@ -61,6 +60,8 @@ f1_mean = []
 iou = []
 dice = []
 
+f_coef = 0.5
+
 for i in range(len(test_dataset)):
     print(f'{i} / {len(test_dataset)}')
     
@@ -79,14 +80,10 @@ for i in range(len(test_dataset)):
         pred = torch.argmax(pred, dim=1)[0]
         
         pred = pred.cpu()
-        # print(f'pred {pred.shape}')
-        # print(f'mask {mask.shape}')
-        # exit()
-        # torch.save(pred, f'/home/maantonov_1/VKR/actual_scripts/EVAL/pred_img/pred{i}.pt')
-        # torch.save(mask, f'/home/maantonov_1/VKR/actual_scripts/EVAL/pred_img/mask{i}.pt')
-        # torch.save(img, f'/home/maantonov_1/VKR/actual_scripts/EVAL/pred_img/img{i}.pt')
         
-        accuracy, precision, recall, f1 = calculate_semantic_metrics(pred, mask)
+        
+        
+        accuracy, precision, recall, f1 = calculate_semantic_metrics(pred, mask, f_coef = f_coef)
         
         accuracy_mean.append(accuracy)
         precision_mean.append(precision)
@@ -104,6 +101,6 @@ for i in range(len(test_dataset)):
 print(f'Accuracy: {np.mean(accuracy_mean)}')
 print(f'Precision: {np.mean(precision_mean)}')
 print(f'Recall: {np.mean(recall_mean)}')
-print(f'F1 Score: {np.mean(f1_mean)}')
+print(f'F{f_coef} Score: {np.mean(f1_mean)}')
 print(f'iou: {np.mean(iou)}')
 print(f'dice: {np.mean(dice)}')

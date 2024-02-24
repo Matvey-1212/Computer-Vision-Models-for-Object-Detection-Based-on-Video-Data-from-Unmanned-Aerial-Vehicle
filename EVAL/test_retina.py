@@ -30,7 +30,7 @@ torch.cuda.empty_cache()
 print('CUDA available: {}'.format(torch.cuda.is_available()), flush=True)
 print(f'Crreating retinanet ===>', flush=True)
 
-path_to_weights = '/home/maantonov_1/VKR/actual_scripts/retinanet_sep/temp_weights_retina/retinanet_only_19_0.2869687195747129.pt'
+path_to_weights = '/home/maantonov_1/VKR/weights/retinanet/retinanet9_0.28338393047752397.pt'
 
 retinanet = torch.load(path_to_weights, map_location=device)
 

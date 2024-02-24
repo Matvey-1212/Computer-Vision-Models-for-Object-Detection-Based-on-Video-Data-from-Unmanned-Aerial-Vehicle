@@ -178,7 +178,7 @@ def evaluate(inference_res, iou_thr_min=0.5, iou_thr_max=0.95, iou_thr_step=0.05
 
     return np.mean(map), np.mean(mFscore)
 
-def calculate_semantic_metrics(outputs, labels):
+def calculate_semantic_metrics(outputs, labels, f_coef = 1):
     preds = outputs > 0.5
     TP = (preds & labels).sum().float()
     FP = ((preds == 1) & (labels == 0)).sum().float()
@@ -188,7 +188,7 @@ def calculate_semantic_metrics(outputs, labels):
     accuracy = (TP + TN) / (TP + FP + TN + FN)
     precision = TP / (TP + FP) if (TP + FP) > 0 else torch.tensor(0.0)
     recall = TP / (TP + FN) if (TP + FN) > 0 else torch.tensor(0.0)
-    f1 = 2 * (precision * recall) / (precision + recall) if (precision + recall) > 0 else torch.tensor(0.0)
+    f1 = (1 + f_coef ** 2) * (precision * recall) / ((f_coef ** 2) * precision + recall) if (precision + recall) > 0 else torch.tensor(0.0)
 
     return accuracy.item(), precision.item(), recall.item(), f1.item()
 
