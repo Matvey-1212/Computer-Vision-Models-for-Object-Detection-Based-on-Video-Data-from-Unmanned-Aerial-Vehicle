@@ -3,6 +3,7 @@ import time
 import numpy as np
 import pandas as pd
 import random
+import datetime
 
 import wandb
 import torch
@@ -20,23 +21,25 @@ from retinanet import model
 # import torch.autograd
 # torch.autograd.set_detect_anomaly(True)
 
-os.environ["WANDB_MODE"]="offline" 
-wandb.init(project="VKR", entity="matvey_antonov", name = "just_retina_full_640_step_7")
 
-epochs = 25
+
+epochs = 30
 batch_size = 32
-num_workers = 8
-weights_name = '/home/maantonov_1/VKR/actual_scripts/retinanet_sep/temp_weights_retina/retinanet_only'
+num_workers = 4
+weights_name = '2_retinanet_full_lr0.0003_step_10'
+path_to_save = '/home/maantonov_1/VKR/weights/retinanet/23_02_2024/' + weights_name
 
 #optimazer
-start_lr   = 0.0005
-num_steps  = 5
+start_lr   = 0.0003
+num_steps  = 10
 gamma_coef = 0.5
 
+os.environ["WANDB_MODE"]="offline" 
+wandb.init(project="VKR", entity="matvey_antonov", name = f"{weights_name}_{datetime.date.today().isoformat()}")
 
 
 local_transform = A.Compose([ # flip inside augmenter
-    A.GaussNoise(p=0.1), 
+    A.GaussNoise(p=0.2), 
     A.ColorJitter(brightness=0.2, contrast=0.2, saturation=0.2, hue=0.2, p=0.3)
 ])
 
@@ -174,7 +177,7 @@ def valid_one_epoch(epoch_num, valid_data_loader):
     print("\n Total Time - {}\n".format(int(et - st)))
     
 
-    torch.save(retinanet, f"{weights_name}_{epoch_num}_{np.mean(epoch_loss)}.pt")
+    torch.save(retinanet, f"{path_to_save}_{epoch_num}_{np.mean(epoch_loss)}.pt")
     return np.mean(epoch_loss)
     
     

@@ -24,13 +24,13 @@ from loss import Weighted_Cross_Entropy_Loss, MSE, IOU_loss
 
 epochs = 30
 batch_size = 8 # не хватает видеопамяти при батче 16 даже на (640х640)
-num_workers = 8
-weights_name = '1_unet_wce_full_data_step_5'
+num_workers = 4
+weights_name = '2_unet_wce_full_data_step_10'
 path_to_save = '/home/maantonov_1/VKR/weights/unet/cross/23_02_2024/' + weights_name
 
 #optimazer
-start_lr   = 0.0005
-num_steps  = 5
+start_lr   = 0.0003
+num_steps  = 10
 gamma_coef = 0.5
 
 os.environ["WANDB_MODE"]="offline" 

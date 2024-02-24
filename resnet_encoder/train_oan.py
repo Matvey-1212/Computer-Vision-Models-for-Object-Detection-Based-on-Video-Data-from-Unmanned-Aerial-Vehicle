@@ -24,13 +24,13 @@ from loss import OAN_Focal_Loss, Weighted_Cross_Entropy_Loss
 
 epochs = 30
 batch_size = 32
-num_workers = 8
-weights_name = '1_resnet_oan_main_full_step_5'
-path_to_save = '/home/maantonov_1/VKR/weights/resnet_oan/23_02_2024' + weights_name
+num_workers = 4
+weights_name = '2_resnet_oan_main_full_step_10'
+path_to_save = '/home/maantonov_1/VKR/weights/resnet_oan/23_02_2024/' + weights_name
 
 #optimazer
-start_lr   = 0.0005
-num_steps  = 5
+start_lr   = 0.0003
+num_steps  = 10
 gamma_coef = 0.5
 
 #criterion
