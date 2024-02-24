@@ -1,11 +1,7 @@
 # Исключаем файлы с расширениями .log, .txt, .pt
 *.log
 *.err
-*.txt
 *.pt
-*.JPG
-*.jpg
-*.txt
 
 # Исключаем папку с именем wandb
 wandb/
