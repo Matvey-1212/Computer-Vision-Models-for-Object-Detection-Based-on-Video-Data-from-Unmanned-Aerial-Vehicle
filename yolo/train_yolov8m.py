@@ -6,15 +6,15 @@ Task.set_offline(offline_mode=True)
 task = Task.init(project_name='VKR', task_name='yolov8m')
 
 
-model = YOLO('/home/maantonov_1/VKR/weights/yolov8_visdrone/yolov8m.pt')
+model = YOLO('/home/maantonov_1/VKR/actual_scripts/yolo/runs/detect/yolov8m_small_data/weights/best.pt')
  
 # Training.
 results = model.train(
    data='/home/maantonov_1/VKR/actual_scripts/yolo/data_conf/data_conf.yml',
-   imgsz=640,
+   imgsz=1024,
    epochs=150,
-   batch=32,
-   name='yolov8m',
+   batch=16,
+   name='yolov8m_small_data+main',
    device='0',
    task= 'detect', # (str) YOLO task, i.e. detect, segment, classify, pose
    mode= 'train',

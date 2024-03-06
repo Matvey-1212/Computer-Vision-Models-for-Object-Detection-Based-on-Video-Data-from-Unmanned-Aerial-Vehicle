@@ -2,12 +2,12 @@ import os
 import random
 import shutil
 
-parent_folder = '/home/maantonov_1/VKR/data/small_train/full_crop_train'
+parent_folder = '/home/maantonov_1/VKR/data/crope_data/small/small_crop_train'
 images_folder = os.path.join(parent_folder, 'images')
 labels_folder = os.path.join(parent_folder, 'labels')
 
-dest_folder_train = '/home/maantonov_1/VKR/data/small_train/full_sep_crop/train'
-dest_folder_test = '/home/maantonov_1/VKR/data/small_train/full_sep_crop/val'
+dest_folder_train = '/home/maantonov_1/VKR/data/for_yolo/small_crop_1024/train'
+dest_folder_test = '/home/maantonov_1/VKR/data/for_yolo/small_crop_1024/val'
 train_ratio = 0.8
 
 

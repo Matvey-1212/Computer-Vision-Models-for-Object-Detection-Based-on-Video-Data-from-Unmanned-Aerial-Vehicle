@@ -1,0 +1,20 @@
+#!/bin/bash
+#SBATCH --job-name=retina_oan_winter_test              # Название задачи
+#SBATCH --error=retina_oan_winter_test-%j.err          # Файл для вывода ошибок
+#SBATCH --output=retina_oan_winter_test-%j.log         # Файл для вывода результатов
+#SBATCH --time=20:00:00              # Максимальное время выполнения
+#SBATCH --ntasks=1                   # Количество MPI процессов
+#SBATCH --nodes=1                    # Требуемое кол-во узлов
+#SBATCH --cpus-per-task=4       # Количество ядер CPU, выделенных для одного процесса
+#SBATCH --gpus 1  
+#SBATCH -A proj_1466
+
+
+
+module purge
+module load Python
+source deactivate
+source activate retinanet
+
+
+python -u test_retina_oan.py

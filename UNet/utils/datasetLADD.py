@@ -17,6 +17,8 @@ class LADD(Dataset):
                  class_mask = False,  
                  smart_crop = False, 
                  new_shape = (640, 640),
+                 season = None,
+                 img_endwith = '.JPG',
                  transforms = None):
         
         super().__init__()
@@ -24,10 +26,15 @@ class LADD(Dataset):
         self.dataframes_list = []
         for data in dataframes_list:
             dataset = {}
+            if season is not None:
+                data['dataframe'] = data['dataframe'][data['dataframe']['season'] == season].reset_index(drop=True)
+                
             dataset['image_ids'] = data['dataframe']['id'] if smart_crop else data['dataframe']['id'].unique()
             dataset['image_lab'] = data['dataframe'][['x', 'y', 'w', 'h','class','width','height']]
             dataset['df']        = data['dataframe']
             dataset['image_dir'] = data['image_dir']
+            
+                
             self.dataframes_list.append(dataset)
         
         self.mode = mode
@@ -39,6 +46,7 @@ class LADD(Dataset):
         self.class_mask = class_mask
         self.small_class_mask = small_class_mask
         self.from_255_to_1 = from_255_to_1
+        self.img_endwith = img_endwith
     
     def gaus_mask(self, img, annot):
         height, width, _ = img.shape
@@ -228,52 +236,55 @@ class LADD(Dataset):
         records = df[df['id'] == image_id]
 
 
-        image = cv2.imread(f'{image_dir}/{image_id}.JPG', cv2.IMREAD_COLOR)
+        image = cv2.imread(f'{image_dir}/{image_id}{img_endwith}', cv2.IMREAD_COLOR)
         if self.from_255_to_1:
             image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB).astype(np.float32)
             image /= 255.0
         
 
-        if self.mode == "train" or self.mode == "valid":
+        # if self.mode == "train" or self.mode == "valid":
             
-            width = records['width'].values.astype(int)
-            height = records['height'].values.astype(int)
+        width = records['width'].values.astype(int)
+        height = records['height'].values.astype(int)
 
-            
-            boxes = self.data_format_min_max(records[['x', 'y', 'w', 'h']].values, width, height)
-
-            
-            if  self.smart_crop:
-
-                image_lab = self.data_format_min_max_one_lab(image_lab)
-
-                image, boxes = self.random_crop_with_bbox(image, image_lab, boxes, self.new_shape, teshold=0.4, format = self.data_format)
-            
-            if self.gaus:
-                gaus_mask = self.gaus_mask(image, boxes)
-                sample = {'img': image, 'mask': gaus_mask, 'annot':boxes} 
-            elif self.class_mask:
-                class_mask = self.create_class_mask(image, boxes)
-                sample = {'img': image, 'mask': class_mask, 'annot':boxes} 
-            elif self.small_class_mask:
-                class_mask = self.create_small_class_mask(image, boxes)
-                sample = {'img': image, 'mask': class_mask, 'annot':boxes} 
-            else:
-                sample = {'img': image, 'annot':boxes}
-            
-            if self.transforms:
-                sample = self.transforms(sample)
-            
-            return sample
         
-        elif self.mode == "test":
+        boxes = self.data_format_min_max(records[['x', 'y', 'w', 'h']].values, width, height)
+
+        
+        if  self.smart_crop:
+
+            image_lab = self.data_format_min_max_one_lab(image_lab)
+
+            image, boxes = self.random_crop_with_bbox(image, image_lab, boxes, self.new_shape, teshold=0.4, format = self.data_format)
+        
+        if self.gaus:
+            gaus_mask = self.gaus_mask(image, boxes)
+            sample = {'img': image, 'mask': gaus_mask, 'annot':boxes} 
+        elif self.class_mask:
+            class_mask = self.create_class_mask(image, boxes)
+            sample = {'img': image, 'mask': class_mask, 'annot':boxes} 
+        elif self.small_class_mask:
+            class_mask = self.create_small_class_mask(image, boxes)
+            sample = {'img': image, 'mask': class_mask, 'annot':boxes} 
+        else:
+            sample = {'img': image, 'annot':boxes}
             
-            if self.transforms:
+        if self.mode == "test":
+            sample['id'] = image_id
+        
+        if self.transforms:
+            sample = self.transforms(sample)
+        
+        return sample
+        
+        # elif self.mode == "test":
+            
+        #     if self.transforms:
                 
-                sample = {'img' : image}
-                sample = self.transforms(sample)
+        #         sample = {'img' : image, }
+        #         sample = self.transforms(sample)
                 
-            return sample    
+        #     return sample    
 
     def __len__(self) -> int:
         count = 0

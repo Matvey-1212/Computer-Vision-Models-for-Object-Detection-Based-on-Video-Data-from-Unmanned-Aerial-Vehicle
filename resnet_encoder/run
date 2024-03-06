@@ -1,7 +1,7 @@
 #!/bin/bash
-#SBATCH --job-name=train_resnet              # Название задачи
-#SBATCH --error=train_resnet-%j.err          # Файл для вывода ошибок
-#SBATCH --output=train_resnet-%j.log         # Файл для вывода результатов
+#SBATCH --job-name=train_resnet_visdrone              # Название задачи
+#SBATCH --error=train_resnet_visdrone-%j.err          # Файл для вывода ошибок
+#SBATCH --output=train_resnet_visdrone-%j.log         # Файл для вывода результатов
 #SBATCH --time=40:00:00              # Максимальное время выполнения
 #SBATCH --ntasks=1                   # Количество MPI процессов
 #SBATCH --nodes=1                    # Требуемое кол-во узлов

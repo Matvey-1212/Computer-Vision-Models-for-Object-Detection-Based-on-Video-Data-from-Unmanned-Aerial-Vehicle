@@ -103,7 +103,7 @@ for i in range(len(test_dataset)):
 
     prediction.append((gt_dict, pred_dict))
     
-map_score, Fscore = evaluate(prediction)
+map_score, Fscore = evaluate(prediction, score_threshold = 0.5)
 
 print(f'map_score: {map_score}')
 print(f'Fscore: {Fscore}')

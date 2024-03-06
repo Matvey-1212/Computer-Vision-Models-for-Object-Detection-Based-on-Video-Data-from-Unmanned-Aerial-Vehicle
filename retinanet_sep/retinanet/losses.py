@@ -177,7 +177,7 @@ class FocalLoss(nn.Module):
 
 
 class OANFocalLoss(nn.Module):
-    def __init__(self, alpha=0.25, gamma=2.0):
+    def __init__(self, alpha=0.25, gamma=2):
         super(OANFocalLoss, self).__init__()
         self.alpha = alpha
         self.gamma = gamma
@@ -188,71 +188,118 @@ class OANFocalLoss(nn.Module):
     #     F_loss = self.alpha * (1-pt)**self.gamma * BCE_loss
     #     return F_loss.mean()
     
-    def forward(self, map, targets, shape, grid = (64,16)):
+    def forward(self, pred, annotations):
+        
+        n, c, H, W = pred.shape
+        # print(f'pred {pred.shape}')
+        # print(f'pred {pred}')
+        
+        soft_p = torch.sigmoid(pred)
+        # print(f'soft_p {soft_p.shape}')
+        # print(f'soft_p {soft_p}')
+        soft_p = torch.cat((1 - soft_p, soft_p), 1)
+        
+        # print(f'soft_p {soft_p.shape}')
+        # print(f'soft_p {soft_p}')
+        
+        target_map = torch.zeros((n, 1, H, W)).cuda().long()
+        
+        # print(f'target_map {target_map.shape}')
+        # print(f'target_map {target_map}')
+        
+        for i in range(n):
+            for annot in annotations[i]:
+                if int(annot[0]) == -1:
+                    continue
+                
+                x_c = int((annot[2] + annot[0]) / 2 // 64)
+                y_c = int((annot[3] + annot[1]) / 2 // 64)
+                
+                target_map[i, 0, y_c, x_c] = 1
+        
+        
+        soft_p = torch.gather(soft_p, 1, target_map)
+        
+        soft_p = torch.clamp(soft_p, 1e-7, 1.0 - 1e-7)
 
-        # print(f'shape[0] {shape[0]}', flush=True)
-        # print(f'shape[1] {shape[1]}', flush=True)
-        
-        a, g, b, c = map.shape
-        
-        epsilon = 1e-7  
-        map = torch.clamp(map, epsilon, 1.0 - epsilon)
-        
-        # print(f'b {b}', flush=True)
-        # print(f'c {c}', flush=True)
-        
-        w = 64 #shape[0] // b
-        h = 64 #shape[1] // c
-        # print(f'w {w}', flush=True)
-        # print(f'h {h}', flush=True)
-        
-        if torch.cuda.is_available():
-            zero_tensor = torch.zeros((a, b, c), requires_grad=False).cuda()
-        else:
-            zero_tensor = torch.zeros((a, b, c), requires_grad=False)
-        
-        scores= []
+        # print(f'soft_p {soft_p.shape}')
+        # print(f'soft_p {soft_p}')
 
-        for x in range(a):
-            # sub_mup_tensor = map[x, :, :, :].squeeze()
-            # sub_zero_tensor = zero_tensor[x, :, :]
-            sub_target = targets[x, :, :]
+        fl = self.alpha * (1 - soft_p) ** self.gamma * torch.log(soft_p)
+        
+        # print(f'fl {fl.shape}')
+        # print(f'fl {fl}')
+
+
+        loss = -fl.mean()
+
+        return loss
+        
+        
+
+        # # print(f'shape[0] {shape[0]}', flush=True)
+        # # print(f'shape[1] {shape[1]}', flush=True)
+        
+        # a, g, b, c = map.shape
+        
+        # epsilon = 1e-7  
+        # map = torch.clamp(map, epsilon, 1.0 - epsilon)
+        
+        # # print(f'b {b}', flush=True)
+        # # print(f'c {c}', flush=True)
+        
+        # w = 64 #shape[0] // b
+        # h = 64 #shape[1] // c
+        # # print(f'w {w}', flush=True)
+        # # print(f'h {h}', flush=True)
+        
+        # if torch.cuda.is_available():
+        #     zero_tensor = torch.zeros((a, b, c), requires_grad=False).cuda()
+        # else:
+        #     zero_tensor = torch.zeros((a, b, c), requires_grad=False)
+        
+        # scores= []
+
+        # for x in range(a):
+        #     # sub_mup_tensor = map[x, :, :, :].squeeze()
+        #     # sub_zero_tensor = zero_tensor[x, :, :]
+        #     sub_target = targets[x, :, :]
             
-            for y in range(sub_target.shape[0]):
-                sub_sub_target = sub_target[y, :]
+        #     for y in range(sub_target.shape[0]):
+        #         sub_sub_target = sub_target[y, :]
                 
-                h_t = int((sub_sub_target[2] + sub_sub_target[0])/ 2 // h )
-                w_t= int((sub_sub_target[3] + sub_sub_target[1])/ 2 // w)
+        #         h_t = int((sub_sub_target[2] + sub_sub_target[0])/ 2 // h )
+        #         w_t= int((sub_sub_target[3] + sub_sub_target[1])/ 2 // w)
                 
                 
-                if w_t >= 0 and h_t >= 0:
-                    # print(f'w_t {w_t}', flush=True)
-                    # print(f'h_t {h_t}', flush=True)
-                    # print(f'(sub_sub_target[2] + sub_sub_target[0])/ 2 {(sub_sub_target[2] + sub_sub_target[0])/ 2}', flush=True)
-                    # print(f'(sub_sub_target[3] + sub_sub_target[1])/ 2 {(sub_sub_target[3] + sub_sub_target[1])/ 2}', flush=True)
-                    if w_t >= zero_tensor[x].shape[0] or h_t >= zero_tensor[x].shape[1]:
-                        print('ERROR', flush=True)
-                        print(f'sub_zero_tensor.shape[0] {zero_tensor[x].shape[0]}', flush=True)
-                        print(f'sub_zero_tensor.shape[1] {zero_tensor[x].shape[1]}', flush=True)
-                        print(f'sub_sub_target[0] {sub_sub_target[0]}', flush=True)
-                        print(f'sub_sub_target[1] {sub_sub_target[1]}', flush=True)
-                        print(f'sub_sub_target[2] {sub_sub_target[2]}', flush=True)
-                        print(f'sub_sub_target[3] {sub_sub_target[3]}', flush=True)
-                        exit()
+        #         if w_t >= 0 and h_t >= 0:
+        #             # print(f'w_t {w_t}', flush=True)
+        #             # print(f'h_t {h_t}', flush=True)
+        #             # print(f'(sub_sub_target[2] + sub_sub_target[0])/ 2 {(sub_sub_target[2] + sub_sub_target[0])/ 2}', flush=True)
+        #             # print(f'(sub_sub_target[3] + sub_sub_target[1])/ 2 {(sub_sub_target[3] + sub_sub_target[1])/ 2}', flush=True)
+        #             if w_t >= zero_tensor[x].shape[0] or h_t >= zero_tensor[x].shape[1]:
+        #                 print('ERROR', flush=True)
+        #                 print(f'sub_zero_tensor.shape[0] {zero_tensor[x].shape[0]}', flush=True)
+        #                 print(f'sub_zero_tensor.shape[1] {zero_tensor[x].shape[1]}', flush=True)
+        #                 print(f'sub_sub_target[0] {sub_sub_target[0]}', flush=True)
+        #                 print(f'sub_sub_target[1] {sub_sub_target[1]}', flush=True)
+        #                 print(f'sub_sub_target[2] {sub_sub_target[2]}', flush=True)
+        #                 print(f'sub_sub_target[3] {sub_sub_target[3]}', flush=True)
+        #                 exit()
 
-                    zero_tensor[x, w_t, h_t] = 1
+        #             zero_tensor[x, w_t, h_t] = 1
                     
                     
                     
             
-            # scores.append((-self.alpha*torch.pow(1 - map, self.gamma) * torch.log(map) * zero_tensor.unsqueeze(dim=1) + (- self.alpha*(1-zero_tensor.unsqueeze(dim=1))*torch.pow(map, self.gamma) * torch.log(1 - map))).mean())
-            # scores[-1] = (- self.alpha*(1-sub_zero_tensor)*torch.pow(sub_mup_tensor, self.gamma) * torch.log(1 - sub_mup_tensor))
-            # scores[-1] = scores[-1].mean()
+        #     # scores.append((-self.alpha*torch.pow(1 - map, self.gamma) * torch.log(map) * zero_tensor.unsqueeze(dim=1) + (- self.alpha*(1-zero_tensor.unsqueeze(dim=1))*torch.pow(map, self.gamma) * torch.log(1 - map))).mean())
+        #     # scores[-1] = (- self.alpha*(1-sub_zero_tensor)*torch.pow(sub_mup_tensor, self.gamma) * torch.log(1 - sub_mup_tensor))
+        #     # scores[-1] = scores[-1].mean()
 
         
-        # del zero_tensor
+        # # del zero_tensor
  
-        return (-self.alpha*torch.pow(1 - map, self.gamma) * torch.log(map) * zero_tensor.unsqueeze(dim=1) + (- self.alpha*(1-zero_tensor.unsqueeze(dim=1))*torch.pow(map, self.gamma) * torch.log(1 - map))).mean()
+        # return (-self.alpha*torch.pow(1 - map, self.gamma) * torch.log(map) * zero_tensor.unsqueeze(dim=1) + (- self.alpha*(1-zero_tensor.unsqueeze(dim=1))*torch.pow(map, self.gamma) * torch.log(1 - map))).mean()
     
     
         

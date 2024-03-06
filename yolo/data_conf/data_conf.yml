@@ -1,6 +1,6 @@
 # data.yaml
-train: /home/maantonov_1/VKR/data/small_train/full_sep_crop/train
-val: /home/maantonov_1/VKR/data/small_train/full_sep_crop/val
+train: /home/maantonov_1/VKR/data/crope_data/main/crop_train_1024
+val: /home/maantonov_1/VKR/data/crope_data/main/crop_val_1024
 
 nc: 1  # number of classes
 names: ['class1']  # class names

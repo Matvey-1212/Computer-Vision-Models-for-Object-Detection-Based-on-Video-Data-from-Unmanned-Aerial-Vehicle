@@ -1,7 +1,7 @@
 #!/bin/bash
-#SBATCH --job-name=yolo_test              # Название задачи
-#SBATCH --error=yolo_test-%j.err          # Файл для вывода ошибок
-#SBATCH --output=yolo_test-%j.log         # Файл для вывода результатов
+#SBATCH --job-name=yolo_test_summer              # Название задачи
+#SBATCH --error=yolo_test_summer-%j.err          # Файл для вывода ошибок
+#SBATCH --output=yolo_test_summer-%j.log         # Файл для вывода результатов
 #SBATCH --time=20:00:00              # Максимальное время выполнения
 #SBATCH --ntasks=1                   # Количество MPI процессов
 #SBATCH --nodes=1                    # Требуемое кол-во узлов

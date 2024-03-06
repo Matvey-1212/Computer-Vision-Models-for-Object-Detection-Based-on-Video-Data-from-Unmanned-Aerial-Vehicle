@@ -1,7 +1,7 @@
 #!/bin/bash
-#SBATCH --job-name=get_mean              # Название задачи
-#SBATCH --error=get_mean-%j.err          # Файл для вывода ошибок
-#SBATCH --output=get_mean-%j.log         # Файл для вывода результатов
+#SBATCH --job-name=train_test_split              # Название задачи
+#SBATCH --error=train_test_split-%j.err          # Файл для вывода ошибок
+#SBATCH --output=train_test_split-%j.log         # Файл для вывода результатов
 #SBATCH --time=20:00:00              # Максимальное время выполнения
 #SBATCH --ntasks=1                   # Количество MPI процессов
 #SBATCH --nodes=1                    # Требуемое кол-во узлов
@@ -13,4 +13,4 @@ module load Python
 source deactivate
 source activate retinanet
 
-python -u get_mean.py
+python -u train_test_split.py

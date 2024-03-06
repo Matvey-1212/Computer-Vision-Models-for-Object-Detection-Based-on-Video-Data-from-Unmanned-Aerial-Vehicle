@@ -191,7 +191,7 @@ def collater_annot(data):
 class Resizer(object):
     """Convert ndarrays in sample to Tensors."""
 
-    def __call__(self, sample, min_side=640, max_side=640, coef = 64):
+    def __call__(self, sample, min_side=608, max_side=1024):
         image, annots = sample['img'], sample['annot']
 
         rows, cols, cns = image.shape
@@ -212,15 +212,28 @@ class Resizer(object):
         image = skimage.transform.resize(image, (int(round(rows*scale)), int(round((cols*scale)))))
         rows, cols, cns = image.shape
 
-        pad_w = 32 - rows%coef
-        pad_h = 32 - cols%coef
+        pad_w = 64 - rows%64
+        pad_h = 64 - cols%64
 
         new_image = np.zeros((rows + pad_w, cols + pad_h, cns)).astype(np.float32)
         new_image[:rows, :cols, :] = image.astype(np.float32)
+        
+        if annots.shape[0] != 0:
+            annots[:, :4] *= scale
+        
+        sample['img']   = torch.from_numpy(new_image)
+        sample['annot'] = torch.from_numpy(annots)
+        sample['scale'] = scale
+        
+        
+        if 'mask' in sample:
+            mask = sample['mask']
+            rows, cols, cns = new_image.shape
+            mask = skimage.transform.resize(mask, (int(round(rows//64)), int(round((cols//64)))))
+            sample['mask'] = torch.from_numpy(mask)
+            
 
-        annots[:, :4] *= scale
-
-        return {'img': torch.from_numpy(new_image), 'annot': torch.from_numpy(annots), 'scale': scale}
+        return sample
     
 class ToTorch(object):
     def __call__(self, sample):
@@ -231,12 +244,18 @@ class ToTorch(object):
         #     annots = sample['annot']
         #     return {'img': torch.from_numpy(image.copy()), 'annot': torch.from_numpy(annots.copy()), 'scale': 1}
         
+        # if 'mask' in sample:
+        #     mask = sample['mask']
+        #     return {'img': torch.from_numpy(image.copy()), 'mask': torch.from_numpy(mask.copy()), 'annot': torch.from_numpy(annots.copy()), 'scale': 1}
+        
+        sample['img'] = torch.from_numpy(image.copy())
+        sample['annot'] = torch.from_numpy(annots.copy())
+        sample['scale'] = 1
         if 'mask' in sample:
             mask = sample['mask']
-            return {'img': torch.from_numpy(image.copy()), 'mask': torch.from_numpy(mask.copy()), 'annot': torch.from_numpy(annots.copy()), 'scale': 1}
+            sample['mask'] = torch.from_numpy(mask.copy())
         
-        
-        return {'img': torch.from_numpy(image.copy()), 'annot': torch.from_numpy(annots.copy()),'scale': 1}
+        return sample #{'img': torch.from_numpy(image.copy()), 'annot': torch.from_numpy(annots.copy()),'scale': 1}
     
 class AddDim(object):
     def __call__(self, sample):
@@ -325,11 +344,14 @@ class Normalizer(object):
 
         image, annots = sample['img'], sample['annot']
         
-        if 'mask' in sample:
-            mask = sample['mask']
-            return {'img':((image.astype(np.float32)-self.mean)/self.std),'mask': mask, 'annot': annots}
+        
+        # if 'mask' in sample:
+        #     mask = sample['mask']
+            # return {'img':((image.astype(np.float32)-self.mean)/self.std),'mask': mask, 'annot': annots}
+            
+        sample['img'] = ((image.astype(np.float32)-self.mean)/self.std)
 
-        return {'img':((image.astype(np.float32)-self.mean)/self.std), 'annot': annots}
+        return sample
 
 class UnNormalizer(object):
     def __init__(self, mean=None, std=None):

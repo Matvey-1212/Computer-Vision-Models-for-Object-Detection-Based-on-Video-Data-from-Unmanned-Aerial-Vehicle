@@ -11,10 +11,11 @@ import torch.optim as optim
 
 from torch.utils.data import DataLoader
 import torchvision.transforms as transforms
+import torchvision.transforms as T
 import torchvision.transforms.functional as F
 import albumentations as A
 
-from utils.datasetLLAD import LLAD
+from utils.datasetLADD import LADD
 from utils.dataloader import collater_annot, ToTorch, Augmenter, Normalizer
 from retinanet import model
 
@@ -24,10 +25,10 @@ from retinanet import model
 
 
 epochs = 30
-batch_size = 32
+batch_size = 8
 num_workers = 4
-weights_name = '2_retinanet_full_lr0.0003_step_10'
-path_to_save = '/home/maantonov_1/VKR/weights/retinanet/23_02_2024/' + weights_name
+weights_name = '3_retinanet_full_lr0.0003_step_10'
+path_to_save = '/home/maantonov_1/VKR/weights/retinanet/02_03_2024/' + weights_name
 
 #optimazer
 start_lr   = 0.0003
@@ -44,16 +45,16 @@ local_transform = A.Compose([ # flip inside augmenter
 ])
 
 
-train_df = [{'dataframe': pd.read_csv('/home/maantonov_1/VKR/data/main_data/crop_train/croped_main_train.csv'),
-             'image_dir': '/home/maantonov_1/VKR/data/main_data/crop_train/images'},
-            {'dataframe': pd.read_csv('/home/maantonov_1/VKR/data/small_train/full_crop_train/croped_small_train.csv'),
-             'image_dir': '/home/maantonov_1/VKR/data/small_train/full_crop_train/images'}]
+train_df = [{'dataframe': pd.read_csv('/home/maantonov_1/VKR/data/crope_data/main/crop_train_1024/crop_train_1024.csv'),
+             'image_dir': '/home/maantonov_1/VKR/data/crope_data/main/crop_train_1024/images'},
+            {'dataframe': pd.read_csv('/home/maantonov_1/VKR/data/crope_data/main/small_crop_train/crop_small_train.csv'),
+             'image_dir': '/home/maantonov_1/VKR/data/crope_data/main/small_crop_train/images'}]
 
-valid_df = [{'dataframe': pd.read_csv('/home/maantonov_1/VKR/data/main_data/crop_val/croped_val.csv'),
-             'image_dir': '/home/maantonov_1/VKR/data/main_data/crop_val/images'}]
+valid_df = [{'dataframe': pd.read_csv('/home/maantonov_1/VKR/data/crope_data/main/crop_val_1024/crop_val_1024.csv'),
+             'image_dir': '/home/maantonov_1/VKR/data/crope_data/main/crop_val_1024/images'}]
 
-train_dataset = LLAD(train_df, mode = "train", transforms = T.Compose([Augmenter(local_transform), Normalizer(), ToTorch()]))
-valid_dataset = LLAD(valid_df, mode = "valid", transforms = T.Compose([Normalizer(), ToTorch()]))
+train_dataset = LADD(train_df, mode = "train", transforms = T.Compose([Augmenter(local_transform), Normalizer(), ToTorch()]))
+valid_dataset = LADD(valid_df, mode = "valid", transforms = T.Compose([Normalizer(), ToTorch()]))
 print(f'dataset Created', flush=True)
 
 

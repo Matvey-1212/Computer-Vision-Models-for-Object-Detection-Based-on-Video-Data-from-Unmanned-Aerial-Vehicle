@@ -13,7 +13,7 @@ from torch.utils.data import DataLoader
 import albumentations as A
 
 from utils.datasetLADD import LADD
-from utils.dataloader import collater_mask, ToTorch, Augmenter, Normalizer
+from utils.dataloader import collater_mask, ToTorch, Augmenter, Normalizer, Resizer
 
 from oan.model import OAN
 from loss import OAN_Focal_Loss, Weighted_Cross_Entropy_Loss
@@ -22,15 +22,15 @@ from loss import OAN_Focal_Loss, Weighted_Cross_Entropy_Loss
 
 
 
-epochs = 30
-batch_size = 32
+epochs = 15
+batch_size = 8
 num_workers = 4
-weights_name = '2_resnet_oan_main_full_step_10'
-path_to_save = '/home/maantonov_1/VKR/weights/resnet_oan/23_02_2024/' + weights_name
+weights_name = 'resnet_oan_main_visdrone_step_5'
+path_to_save = '/home/maantonov_1/VKR/weights/resnet_oan/04_03_2024/' + weights_name
 
 #optimazer
 start_lr   = 0.0003
-num_steps  = 10
+num_steps  = 5
 gamma_coef = 0.5
 
 #criterion
@@ -42,20 +42,18 @@ wandb.init(project="VKR", entity="matvey_antonov", name = f"{weights_name}_{date
 
 local_transform = A.Compose([ # flip inside augmenter
     A.GaussNoise(p=0.2), 
-    A.ColorJitter(brightness=0.2, contrast=0.2, saturation=0.2, hue=0.2, p=0.3)
+    A.ColorJitter(brightness=0.2, contrast=0.2, saturation=0.2, hue=0.2, p=0.4)
 ])
 
 
-train_df = [{'dataframe': pd.read_csv('/home/maantonov_1/VKR/data/main_data/crop_train/croped_main_train.csv'),
-             'image_dir': '/home/maantonov_1/VKR/data/main_data/crop_train/images'},
-            {'dataframe': pd.read_csv('/home/maantonov_1/VKR/data/small_train/full_crop_train/croped_small_train.csv'),
-             'image_dir': '/home/maantonov_1/VKR/data/small_train/full_crop_train/images'}]
+train_df = [{'dataframe': pd.read_csv('/home/maantonov_1/VKR/data/visdrone/visdrone/VisDrone2019-DET-train/visdrone_train.csv'),
+             'image_dir': '/home/maantonov_1/VKR/data/visdrone/visdrone/VisDrone2019-DET-train/images'}]
 
-valid_df = [{'dataframe': pd.read_csv('/home/maantonov_1/VKR/data/main_data/crop_val/croped_val.csv'),
-             'image_dir': '/home/maantonov_1/VKR/data/main_data/crop_val/images'}]
+valid_df = [{'dataframe': pd.read_csv('/home/maantonov_1/VKR/data/visdrone/visdrone/VisDrone2019-DET-val/visdrone_val.csv'),
+             'image_dir': '/home/maantonov_1/VKR/data/visdrone/visdrone/VisDrone2019-DET-val/images'}]
 
-train_dataset = LADD(train_df, mode = "train", small_class_mask=True, transforms = T.Compose([Augmenter(local_transform), Normalizer(), ToTorch()]))
-valid_dataset = LADD(valid_df, mode = "valid", small_class_mask=True, transforms = T.Compose([Normalizer(), ToTorch()]))
+train_dataset = LADD(train_df, mode = "train", small_class_mask=True, img_endwith = '.jpg', transforms = T.Compose([Augmenter(local_transform), Normalizer(), Resizer()]))
+valid_dataset = LADD(valid_df, mode = "valid", small_class_mask=True, img_endwith = '.jpg', transforms = T.Compose([Normalizer(), Resizer()]))
 
 print(f'dataset Created', flush=True)
 
@@ -84,7 +82,7 @@ print(f'Creating model ===>', flush=True)
 
 model = OAN();
 
-optimizer = torch.optim.Adam(model.parameters(), lr = start_lr)
+optimizer = torch.optim.SGD(model.parameters(), lr = start_lr)
 criterion = Weighted_Cross_Entropy_Loss(w_1 = wce_weight)
 
 lr_scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size = num_steps, gamma=gamma_coef)
@@ -113,6 +111,9 @@ def train_one_epoch(epoch_num, train_data_loader):
         loss = criterion(pred, mask)
 
         if bool(loss == 0):
+            print(
+            'Epoch: {} | Iteration: {} Map loss {:1.5f}| Running loss: {:1.5f}'.format(
+                epoch_num, iter_num, float(loss) , np.mean(epoch_loss)), flush=True)
             continue
                 
 
