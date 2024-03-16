@@ -3,6 +3,7 @@ import time
 import numpy as np
 import pandas as pd
 import cv2
+import datetime
 
 import torch
 from ultralytics import YOLO
@@ -11,18 +12,18 @@ from utils.datasetLADD import LADD
 from metrics import evaluate
 
 
-
+score_threshold=  0.5
 
 
 test_df = [{'dataframe': pd.read_csv('/home/maantonov_1/VKR/data/main_data/test/test_main.csv'),
              'image_dir': '/home/maantonov_1/VKR/data/main_data/test/images'}]
 
 
-test_dataset = LADD(test_df, mode = "valid", season = 0, from_255_to_1 = False, smart_crop = True, new_shape = (640,640))
+test_dataset = LADD(test_df, mode = "valid", from_255_to_1 = False, smart_crop = True, new_shape = (1024,1024))
 
 torch.cuda.empty_cache()
 
-model = YOLO('/home/maantonov_1/VKR/actual_scripts/yolo/runs/detect/yolov8l2/weights/best.pt')
+model = YOLO('/home/maantonov_1/VKR/actual_scripts/yolo/runs/detect/yolov8m_small_data+main2/weights/best.pt')
 
 time_running = []
 prediction = []
@@ -100,11 +101,13 @@ for i in range(len(test_dataset)):
     # print((gt_dict, pred_dict))
         
 
-map_score, Fscore = evaluate(prediction, score_threshold = 0.5)
+map_score, Fscore = evaluate(prediction, score_threshold = score_threshold)
 
+print(f'{datetime.date.today().isoformat()}')
+print(f'score_threshold {score_threshold}')
 print(f'map_score: {map_score}')
 print(f'Fscore: {Fscore}')
-
+print(f'AVG time: {np.mean(time_running)}')
         
 
     

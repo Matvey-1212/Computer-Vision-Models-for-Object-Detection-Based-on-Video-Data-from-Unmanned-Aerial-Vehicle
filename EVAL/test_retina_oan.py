@@ -10,7 +10,7 @@ from torchvision.utils import make_grid
 from torch.utils.data import DataLoader
 
 from utils.datasetLADD import LADD
-from utils.dataloader import ToTorch, Augmenter, Normalizer
+from utils.dataloader import ToTorch, Augmenter, Normalizer, Resizer
 from retinanet import model_oan
 from metrics import evaluate
 
@@ -19,8 +19,13 @@ from metrics import evaluate
 test_df = [{'dataframe': pd.read_csv('/home/maantonov_1/VKR/data/main_data/test/test_main.csv'),
              'image_dir': '/home/maantonov_1/VKR/data/main_data/test/images'}]
 
+score_threshold = 0.05
 
-test_dataset = LADD(test_df, mode = "valid", season = 1, smart_crop = True, new_shape = (1024,1024), transforms = T.Compose([Normalizer(), ToTorch()]))
+# test_df = [{'dataframe': pd.read_csv('/home/maantonov_1/VKR/data/crope_data/main/crop_val_1024/crop_val_1024.csv'),
+#              'image_dir': '/home/maantonov_1/VKR/data/crope_data/main/crop_val_1024/images'}]
+
+
+test_dataset = LADD(test_df, mode = "valid", smart_crop = True, new_shape = (1024,1024), transforms = T.Compose([Normalizer(), Resizer()]))
 
 print(f'dataset Created', flush=True)
 
@@ -30,7 +35,9 @@ torch.cuda.empty_cache()
 print('CUDA available: {}'.format(torch.cuda.is_available()), flush=True)
 print(f'Crreating retinanet ===>', flush=True)
 
-path_to_weights = '/home/maantonov_1/VKR/weights/retinanet/winter/02_03_2024/retinanet_oan_full_season_lr0.0003_step_5_11_0.40223709622191056.pt'
+
+
+path_to_weights = '/home/maantonov_1/VKR/weights/retinanet/2024-03-15/gamma1_alpha0.01/2024-03-15_retinanet_oan_vis+small+ful_lr:0.0003_step:5_gamma:1_alpha:0.01_n14_m:0.51_f:0.55_val:0.2638_last.pt'
 
 retinanet = torch.load(path_to_weights, map_location=device)
 
@@ -103,8 +110,12 @@ for i in range(len(test_dataset)):
 
     prediction.append((gt_dict, pred_dict))
     
-map_score, Fscore = evaluate(prediction)#, score_threshold = 0.5)
+    
+map_score, Fscore = evaluate(prediction, score_threshold = score_threshold)
 
+print(f'{datetime.date.today().isoformat()}')
+print(f'path_to_weights {path_to_weights}')
+print(f'score_threshold: {score_threshold}')
 print(f'map_score: {map_score}')
 print(f'Fscore: {Fscore}')
 print(f'AVG time: {np.mean(time_running)}')

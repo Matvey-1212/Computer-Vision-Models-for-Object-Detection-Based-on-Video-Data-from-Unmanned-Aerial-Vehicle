@@ -196,20 +196,20 @@ class Resizer(object):
 
         rows, cols, cns = image.shape
 
-        smallest_side = min(rows, cols)
+        # smallest_side = min(rows, cols)
 
-        # rescale the image so the smallest side is min_side
-        scale = min_side / smallest_side
+        # # rescale the image so the smallest side is min_side
+        # scale = min_side / smallest_side
 
-        # check if the largest side is now greater than max_side, which can happen
-        # when images have a large aspect ratio
-        largest_side = max(rows, cols)
+        # # check if the largest side is now greater than max_side, which can happen
+        # # when images have a large aspect ratio
+        # largest_side = max(rows, cols)
 
-        if largest_side * scale > max_side:
-            scale = max_side / largest_side
+        # if largest_side * scale > max_side:
+        #     scale = max_side / largest_side
 
         # resize the image with the computed scale
-        image = skimage.transform.resize(image, (int(round(rows*scale)), int(round((cols*scale)))))
+        image = skimage.transform.resize(image, (int(round(rows)), int(round((cols)))))
         rows, cols, cns = image.shape
 
         pad_w = 32 - rows%32
@@ -218,9 +218,9 @@ class Resizer(object):
         new_image = np.zeros((rows + pad_w, cols + pad_h, cns)).astype(np.float32)
         new_image[:rows, :cols, :] = image.astype(np.float32)
 
-        annots[:, :4] *= scale
+        # annots[:, :4] *= scale
 
-        return {'img': torch.from_numpy(new_image), 'annot': torch.from_numpy(annots), 'scale': scale}
+        return {'img': torch.from_numpy(new_image), 'annot': torch.from_numpy(annots), 'scale': 1}
     
 class ToTorch(object):
     def __call__(self, sample):

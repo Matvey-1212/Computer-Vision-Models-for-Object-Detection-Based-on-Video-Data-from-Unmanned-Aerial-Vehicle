@@ -159,6 +159,7 @@ class ResNet(nn.Module):
 
     def __init__(self, num_classes, block, layers, inputs = 3, oan_gamma = 2, oan_alpha = 0.25):
         self.inplanes = 64
+        self.num_classes = num_classes
         super(ResNet, self).__init__()
         self.conv1 = nn.Conv2d(inputs, 64, kernel_size=7, stride=2, padding=3, bias=False)
         self.bn1 = nn.BatchNorm2d(64)
@@ -200,7 +201,7 @@ class ResNet(nn.Module):
         self.fpn = PyramidFeatures(fpn_sizes[0], fpn_sizes[1], fpn_sizes[2])
 
         self.regressionModel = RegressionModel(256)
-        self.classificationModel = ClassificationModel(256, num_classes=num_classes)
+        self.classificationModel = ClassificationModel(256, num_classes=self.num_classes)
 
         self.anchors = Anchors()
 

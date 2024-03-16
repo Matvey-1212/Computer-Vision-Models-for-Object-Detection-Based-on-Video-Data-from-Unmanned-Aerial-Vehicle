@@ -26,7 +26,7 @@ test_df = [{'dataframe': pd.read_csv('/home/maantonov_1/VKR/data/main_data/test/
              'image_dir': '/home/maantonov_1/VKR/data/main_data/test/images'}]
 
 
-test_dataset = LADD(test_df, mode = "valid", small_class_mask=True, smart_crop = True, new_shape = (1024,1024), transforms = T.Compose([Normalizer(), ToTorch()]))
+test_dataset = LADD(test_df, mode = "valid", small_class_mask=True, small_mask_coef = 32, smart_crop = True, new_shape = (1024,1024), transforms = T.Compose([Normalizer(), ToTorch()]))
 
 
 print(f'dataset Created', flush=True)
@@ -37,7 +37,7 @@ torch.cuda.empty_cache()
 print('CUDA available: {}'.format(torch.cuda.is_available()), flush=True)
 print(f'Crreating retinanet ===>', flush=True)
 
-path_to_weights = '/home/maantonov_1/VKR/weights/mobilenet/06_03_2024/mobilenet_main_lr=0.0003_step_5_10_0.011248815714591933.pt'
+path_to_weights = '/home/maantonov_1/VKR/weights/mobilenet/06_03_2024/mobilenet_main_lr=0.0003_step_5_14_0.010929136687228757.pt'
 
 # model = OAN.OAN();
 
@@ -64,6 +64,8 @@ dice = []
 
 f_coef = 0.5
 
+time_running = []
+
 for i in range(len(test_dataset)):
     print(f'{i} / {len(test_dataset)}')
     
@@ -77,8 +79,13 @@ for i in range(len(test_dataset)):
         img = img.permute(2, 0, 1).to(device).float().unsqueeze(dim=0)
         
         # print(f'img {img.shape}')
-        
+        t = time.time()
         pred = model(img)
+        t1 = time.time()
+        
+        time_running.append(t1-t)
+        print(f'    time: {t1-t}')
+        
         pred = torch.argmax(pred, dim=1)[0]
         
         pred = pred.cpu()
@@ -110,3 +117,4 @@ print(f'Recall: {np.mean(recall_mean)}')
 print(f'F{f_coef} Score: {np.mean(f1_mean)}')
 print(f'iou: {np.mean(iou)}')
 print(f'dice: {np.mean(dice)}')
+print(f'AVG time: {np.mean(time_running)}')

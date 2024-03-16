@@ -23,11 +23,15 @@ def calc_iou(a, b):
     return IoU
 
 class FocalLoss(nn.Module):
-    #def __init__(self):
+    def __init__(self, alpha=0.25, gamma=2):
+        super(FocalLoss, self).__init__()
+        self.alpha = alpha
+        self.gamma = gamma
+        
 
     def forward(self, classifications, regressions, anchors, annotations):
-        alpha = 0.25
-        gamma = 2.0
+        alpha = self.alpha
+        gamma = self.gamma
         batch_size = classifications.shape[0]
         classification_losses = []
         regression_losses = []
@@ -195,12 +199,12 @@ class OANFocalLoss(nn.Module):
         # print(f'pred {pred}')
         
         soft_p = torch.sigmoid(pred)
-        # print(f'soft_p {soft_p.shape}')
-        # print(f'soft_p {soft_p}')
-        soft_p = torch.cat((1 - soft_p, soft_p), 1)
+        alpha_factor = torch.zeros(soft_p.shape) + self.alpha
         
-        # print(f'soft_p {soft_p.shape}')
-        # print(f'soft_p {soft_p}')
+        soft_p = torch.cat((1 - soft_p, soft_p), 1)
+        alpha_factor = torch.cat((1 - alpha_factor, alpha_factor), 1).cuda()
+        
+        
         
         target_map = torch.zeros((n, 1, H, W)).cuda().long()
         
@@ -218,6 +222,7 @@ class OANFocalLoss(nn.Module):
                 target_map[i, 0, y_c, x_c] = 1
         
         
+        
         soft_p = torch.gather(soft_p, 1, target_map)
         
         soft_p = torch.clamp(soft_p, 1e-7, 1.0 - 1e-7)
@@ -225,7 +230,7 @@ class OANFocalLoss(nn.Module):
         # print(f'soft_p {soft_p.shape}')
         # print(f'soft_p {soft_p}')
 
-        fl = self.alpha * (1 - soft_p) ** self.gamma * torch.log(soft_p)
+        fl = alpha_factor * (1 - soft_p) ** self.gamma * torch.log(soft_p)
         
         # print(f'fl {fl.shape}')
         # print(f'fl {fl}')

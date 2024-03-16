@@ -1,17 +1,17 @@
 #!/bin/bash
-#SBATCH --job-name=train_unet_wce_full              # Название задачи
-#SBATCH --error=train_unet_wce_full-%j.err          # Файл для вывода ошибок
-#SBATCH --output=train_unet_wce_full-%j.log         # Файл для вывода результатов
+#SBATCH --job-name=train_at_unet_dali              # Название задачи
+#SBATCH --error=train_at_unet_dali-%j.err          # Файл для вывода ошибок
+#SBATCH --output=train_at_unet_dali-%j.log         # Файл для вывода результатов
 #SBATCH --time=40:00:00                        # Максимальное время выполнения
 #SBATCH --ntasks=1                             # Количество MPI процессов
 #SBATCH --nodes=1                              # Требуемое кол-во узлов
 #SBATCH --cpus-per-task=4                      # Количество ядер CPU, выделенных для одного процесса
 #SBATCH --gpus 1                               # Требуемое кол-во GPU
-#SBATCH -A proj_1466
+#SBATCH -A proj_1513
 
 module purge
 module load Python
 source deactivate
 source activate retinanet
 
-python -u train_unet_wce.py
+python -u train_at_unet_dali.py

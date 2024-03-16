@@ -2,12 +2,12 @@
 #SBATCH --job-name=test              # Название задачи
 #SBATCH --error=test-%j.err          # Файл для вывода ошибок
 #SBATCH --output=test-%j.log         # Файл для вывода результатов
-#SBATCH --time=20:00:00              # Максимальное время выполнения
+#SBATCH --time=02:00:00              # Максимальное время выполнения
 #SBATCH --ntasks=1                   # Количество MPI процессов
 #SBATCH --nodes=1                    # Требуемое кол-во узлов
-#SBATCH --cpus-per-task=4       # Количество ядер CPU, выделенных для одного процесса
+#SBATCH --cpus-per-task=1       # Количество ядер CPU, выделенных для одного процесса
 #SBATCH --gpus 1  
-#SBATCH -A proj_1466
+#SBATCH -A proj_1513
 
 
 
@@ -17,4 +17,4 @@ source deactivate
 source activate retinanet
 
 
-python -u test_unet.py
+nvidia-smi

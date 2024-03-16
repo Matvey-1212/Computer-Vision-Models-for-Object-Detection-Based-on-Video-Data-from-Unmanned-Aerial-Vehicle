@@ -20,6 +20,7 @@ class LADD(Dataset):
                  new_shape = (640, 640),
                  season = None,
                  img_endwith = '.JPG',
+                 for_sahi = False,
                  transforms = None):
         
         super().__init__()
@@ -49,6 +50,7 @@ class LADD(Dataset):
         self.from_255_to_1 = from_255_to_1
         self.img_endwith = img_endwith
         self.small_mask_coef = small_mask_coef
+        self.for_sahi = for_sahi
     
     def gaus_mask(self, img, annot):
         height, width, _ = img.shape
@@ -246,7 +248,14 @@ class LADD(Dataset):
         image_lab = current_data['image_lab'].iloc[index - count].values
         records = df[df['id'] == image_id]
 
-
+        width = records['width'].values.astype(int)
+        height = records['height'].values.astype(int)
+        boxes = self.data_format_min_max(records[['x', 'y', 'w', 'h']].values, width, height)
+        
+        if self.for_sahi:
+            path = f'{image_dir}/{image_id}{self.img_endwith}'
+            return path, boxes
+        
         image = cv2.imread(f'{image_dir}/{image_id}{self.img_endwith}', cv2.IMREAD_COLOR)
         if self.from_255_to_1:
             image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB).astype(np.float32)
@@ -255,11 +264,7 @@ class LADD(Dataset):
 
         # if self.mode == "train" or self.mode == "valid":
             
-        width = records['width'].values.astype(int)
-        height = records['height'].values.astype(int)
-
         
-        boxes = self.data_format_min_max(records[['x', 'y', 'w', 'h']].values, width, height)
 
         
         if  self.smart_crop:

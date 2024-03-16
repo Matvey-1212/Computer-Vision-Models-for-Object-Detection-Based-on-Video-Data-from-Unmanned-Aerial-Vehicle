@@ -35,14 +35,14 @@ results = model.train(
    hsv_s =0.7, # (float) image HSV-Saturation augmentation (fraction)
    hsv_v =0.4, # (float) image HSV-Value augmentation (fraction)
    degrees =0.0, # (float) image rotation (+/- deg)
-   translate= 0.1, # (float) image translation (+/- fraction)
-   scale =0.1, # (float) image scale (+/- gain)
+   translate= 0.2, # (float) image translation (+/- fraction)
+   scale =0.3, # (float) image scale (+/- gain)
    shear =5, # (float) image shear (+/- deg)
-   perspective= 0.001, # (float) image perspective (+/- fraction), range 0-0.001
+   perspective= 0.003, # (float) image perspective (+/- fraction), range 0-0.001
    flipud =0.5, # (float) image flip up-down (probability)
    fliplr =0.5, # (float) image flip left-right (probability)
-   mosaic= 0.1, # (float) image mosaic (probability)
-   mixup= 0.1, # (float) image mixup (probability)
+   mosaic= 0.3, # (float) image mosaic (probability)
+   mixup= 0.3, # (float) image mixup (probability)
    auto_augment= 'randaugment') # (str) auto augmentation policy for classification (randaugment, autoaugment, augmix)
 
 # # Загрузка предварительно обученной модели

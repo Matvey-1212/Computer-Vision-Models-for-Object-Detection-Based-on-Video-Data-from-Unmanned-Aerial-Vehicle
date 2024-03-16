@@ -7,7 +7,7 @@
 #SBATCH --nodes=1                    # Требуемое кол-во узлов
 #SBATCH --cpus-per-task=4       # Количество ядер CPU, выделенных для одного процесса
 #SBATCH --gpus 1  
-#SBATCH -A proj_1466
+#SBATCH -A proj_1513
 
 
 

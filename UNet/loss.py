@@ -27,20 +27,22 @@ def dice_loss(pred, target, smooth=1.):
 class Weighted_Cross_Entropy_Loss(torch.nn.Module):
     """Cross entropy loss that uses weight maps."""
 
-    def __init__(self):
+    def __init__(self, w_1 = 50, w_2 = 1):
         super(Weighted_Cross_Entropy_Loss, self).__init__()
+        self.w_1 = w_1
+        self.w_2 = w_2
 
     def forward(self, pred, target):#, weights
         n, c, H, W = pred.shape
         # # Calculate log probabilities
         logp = F.log_softmax(pred, dim=1)
         
-
+        target = target.long()
         # Gather log probabilities with respect to target
         logp = torch.gather(logp, 1, target.view(n, 1, H, W))
 
-        w_1 = 50#H * W / (1+int(target.sum()))#60
-        w_2 = 1
+        w_1 = self.w_1#H * W / (1+int(target.sum()))#60
+        w_2 = self.w_2
         
         weights = (target * (w_1 - w_2) + w_2)/(w_1 + w_2)
         # Multiply with weights

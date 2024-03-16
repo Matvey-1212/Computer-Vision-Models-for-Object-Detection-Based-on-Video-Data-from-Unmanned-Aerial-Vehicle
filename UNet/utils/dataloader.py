@@ -212,15 +212,28 @@ class Resizer(object):
         image = skimage.transform.resize(image, (int(round(rows*scale)), int(round((cols*scale)))))
         rows, cols, cns = image.shape
 
-        pad_w = 32 - rows%32
-        pad_h = 32 - cols%32
+        pad_w = 64 - rows%64
+        pad_h = 64 - cols%64
 
         new_image = np.zeros((rows + pad_w, cols + pad_h, cns)).astype(np.float32)
         new_image[:rows, :cols, :] = image.astype(np.float32)
+        
+        if annots.shape[0] != 0:
+            annots[:, :4] *= scale
+        
+        sample['img']   = torch.from_numpy(new_image)
+        sample['annot'] = torch.from_numpy(annots)
+        sample['scale'] = scale
+        
+        
+        if 'mask' in sample:
+            mask = sample['mask']
+            rows, cols, cns = new_image.shape
+            mask = skimage.transform.resize(mask, (int(round(rows//64)), int(round((cols//64)))))
+            sample['mask'] = torch.from_numpy(mask)
+            
 
-        annots[:, :4] *= scale
-
-        return {'img': torch.from_numpy(new_image), 'annot': torch.from_numpy(annots), 'scale': scale}
+        return sample
     
 class ToTorch(object):
     def __call__(self, sample):
@@ -237,6 +250,7 @@ class ToTorch(object):
         
         sample['img'] = torch.from_numpy(image.copy())
         sample['annot'] = torch.from_numpy(annots.copy())
+        sample['scale'] = 1
         if 'mask' in sample:
             mask = sample['mask']
             sample['mask'] = torch.from_numpy(mask.copy())

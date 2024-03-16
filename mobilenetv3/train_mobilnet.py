@@ -26,7 +26,7 @@ epochs = 15
 batch_size = 32
 num_workers = 4
 weights_name = 'mobilenet_main_lr=0.0003_step_5'
-path_to_save = '/home/maantonov_1/VKR/weights/mobilenet/06_03_2024/' + weights_name
+path_to_save = '/home/maantonov_1/VKR/weights/mobilenet/10_03_2024/' + weights_name
 
 #optimazer
 start_lr   = 0.0003
@@ -34,7 +34,7 @@ num_steps  = 5
 gamma_coef = 0.5
 
 #criterion
-wce_weight = 10
+wce_weight = 30
 
 os.environ["WANDB_MODE"]="offline" 
 wandb.init(project="VKR", entity="matvey_antonov", name = f"{weights_name}_{datetime.date.today().isoformat()}")
