@@ -208,12 +208,10 @@ class OANFocalLoss(nn.Module):
         
         target_map = torch.zeros((n, 1, H, W)).cuda().long()
         
-        # print(f'target_map {target_map.shape}')
-        # print(f'target_map {target_map}')
-        
+
         for i in range(n):
             for annot in annotations[i]:
-                if int(annot[0]) == -1:
+                if int(annot[4]) == -1:
                     continue
                 
                 x_c = int((annot[2] + annot[0]) / 2 // 64)
@@ -224,17 +222,14 @@ class OANFocalLoss(nn.Module):
         
         
         soft_p = torch.gather(soft_p, 1, target_map)
+        alpha_factor = torch.gather(alpha_factor, 1, target_map)
         
         soft_p = torch.clamp(soft_p, 1e-7, 1.0 - 1e-7)
 
-        # print(f'soft_p {soft_p.shape}')
-        # print(f'soft_p {soft_p}')
+
 
         fl = alpha_factor * (1 - soft_p) ** self.gamma * torch.log(soft_p)
         
-        # print(f'fl {fl.shape}')
-        # print(f'fl {fl}')
-
 
         loss = -fl.mean()
 

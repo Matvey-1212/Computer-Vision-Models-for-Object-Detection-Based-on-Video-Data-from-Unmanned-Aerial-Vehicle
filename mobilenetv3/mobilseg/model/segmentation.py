@@ -8,6 +8,27 @@ from mobilseg.model.base import SegBaseModel
 __all__ = ['MobileNetV3Seg', 'get_mobilenetv3_large_seg', 'get_mobilenetv3_small_seg']
 
 
+
+
+class MobileNetV3_custom_fpn(SegBaseModel):
+    def __init__(self, nclass, aux=False, backbone='mobilenetv3_large', pretrained_base=False, **kwargs):
+        super(MobileNetV3_custom_fpn, self).__init__(nclass, aux, backbone, pretrained_base, **kwargs)
+        self.head = _SegHead(nclass, self.mode, **kwargs)
+        if aux:
+            inter_channels = 40 if self.mode == 'large' else 24
+            self.auxlayer = nn.Conv2d(inter_channels, nclass, 1)
+
+    def forward(self, x):
+        size = x.size()[2:]
+        c1, c2, c3, c4, x3 = self.base_forward(x)
+        
+        
+        
+        # exit()
+        # x = self.head(c4)
+        
+        return x3
+
 class MobileNetV3Seg(SegBaseModel):
     def __init__(self, nclass, aux=False, backbone='mobilenetv3_large', pretrained_base=False, **kwargs):
         super(MobileNetV3Seg, self).__init__(nclass, aux, backbone, pretrained_base, **kwargs)
@@ -19,9 +40,10 @@ class MobileNetV3Seg(SegBaseModel):
     def forward(self, x):
         size = x.size()[2:]
         _, c2, _, c4 = self.base_forward(x)
-        outputs = list()
+        # outputs = list()
         x = self.head(c4)
         
+        # print(f'x {x.shape}')
         return x
         # x = F.interpolate(x, size, mode='bilinear', align_corners=True)
         # outputs.append(x)
@@ -58,7 +80,7 @@ class _LRASPP(nn.Module):
             nn.ReLU(True)
         )
         self.b1 = nn.Sequential(
-            nn.AvgPool2d(kernel_size=(49, 49), stride=(16, 20)),  # check it
+            nn.AvgPool2d(kernel_size=(49, 49), stride=(20, 20)),  # check it
             nn.Conv2d(in_channels, out_channels, 1, bias=False),
             nn.Sigmoid(),
         )

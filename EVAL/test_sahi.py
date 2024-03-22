@@ -7,12 +7,15 @@ import datetime
 
 import torch
 from ultralytics import YOLO
+from sahi import AutoDetectionModel
+from sahi.predict import get_sliced_prediction
 
 from utils.datasetLADD import LADD
 from metrics import evaluate
 
 
-score_threshold=  0.5
+score_threshold=  0.05
+confidence_threshold = 0.3
 
 
 test_df = [{'dataframe': pd.read_csv('/home/maantonov_1/VKR/data/main_data/test/test_main.csv'),
@@ -22,14 +25,16 @@ test_df = [{'dataframe': pd.read_csv('/home/maantonov_1/VKR/data/main_data/test/
 # test_dataset = LADD(test_df, mode = "valid", from_255_to_1 = False, smart_crop = True, new_shape = (1024,1024))
 test_dataset = LADD(test_df, mode = "valid", for_sahi = True)
 
+device = torch.device('cuda') if torch.cuda.is_available() else torch.device('cpu')
 torch.cuda.empty_cache()
+print('CUDA available: {}'.format(torch.cuda.is_available()), flush=True)
 
 # model = YOLO('/home/maantonov_1/VKR/actual_scripts/yolo/runs/detect/yolov8m_small_data+main2/weights/best.pt')
 
 weights = '/home/maantonov_1/VKR/actual_scripts/yolo/runs/detect/yolov8m_small_data+main2/weights/best.pt'
 
 model = AutoDetectionModel.from_pretrained(
-    model_type="yolov8", model_path=yolov8_model_path, confidence_threshold=0.5, device="gpu"
+    model_type="yolov8", model_path=weights, confidence_threshold=confidence_threshold, device=device
 )
 
 time_running = []
@@ -58,11 +63,11 @@ prediction = []
 for i in range(len(test_dataset)):
     print(f'{i} / {len(test_dataset)}')
     
-    path, boxes = test_dataset[i]
+    path, annot = test_dataset[i]
     
     t = time.time()
     results = get_sliced_prediction(
-        path, detection_model, slice_height=1024, slice_width=1024, overlap_height_ratio=0.2, overlap_width_ratio=0.2
+        path, model, slice_height=1024, slice_width=1024, overlap_height_ratio=0.2, overlap_width_ratio=0.2
     )
     t1 = time.time()
     
@@ -70,26 +75,27 @@ for i in range(len(test_dataset)):
     print(f'    time: {t1-t}')
 
     
-    boxes_ = res[0].boxes.xyxy.cpu()                        #xywh bbox list
-    clss_ = res[0].boxes.cls.cpu().tolist()                 #classes Id list
-    confs_ = res[0].boxes.conf.float().cpu().tolist() 
-    
-    boxes = []
-    scores = []
-    labels = [] 
-    
-    for box, cls, conf in zip(boxes_, clss_, confs_):
-        boxes.append(box.numpy())
-        scores.append(conf)
-        labels.append(cls)
-    
-    
-    
-    
+    object_prediction_list = results.object_prediction_list
+    boxes_list = []
+    clss_list = []
+    scr_list = []
     pred_dict = {}
-    pred_dict['scores'] = np.asarray(scores)
-    pred_dict['labels'] = np.asarray(labels)
-    pred_dict['boxes']  = np.asarray(boxes)
+
+    for ind, _ in enumerate(object_prediction_list):
+        boxes = (
+            object_prediction_list[ind].bbox.minx,
+            object_prediction_list[ind].bbox.miny,
+            object_prediction_list[ind].bbox.maxx,
+            object_prediction_list[ind].bbox.maxy,
+        )
+        clss = object_prediction_list[ind].category.id
+        scr = object_prediction_list[ind].score.value
+        boxes_list.append(list(boxes))
+        clss_list.append(clss)
+        scr_list.append(scr)
+    pred_dict['boxes'] = np.array(boxes_list)
+    pred_dict['labels'] = np.array(clss_list)
+    pred_dict['scores'] = np.array(scr_list)
     
     
     gt_dict = {}
@@ -111,6 +117,7 @@ map_score, Fscore = evaluate(prediction, score_threshold = score_threshold)
 
 print(f'{datetime.date.today().isoformat()}')
 print(f'score_threshold {score_threshold}')
+print(f'confidence_threshold {confidence_threshold}')
 print(f'map_score: {map_score}')
 print(f'Fscore: {Fscore}')
 print(f'AVG time: {np.mean(time_running)}')

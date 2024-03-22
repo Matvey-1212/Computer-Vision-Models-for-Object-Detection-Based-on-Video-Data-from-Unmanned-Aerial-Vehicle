@@ -9,6 +9,7 @@ from retinanet.anchors import Anchors
 from retinanet import losses
 from retinanet import OAN
 import torch.nn.functional as F
+import time
 
 model_urls = {
     'resnet18': 'https://download.pytorch.org/models/resnet18-5c106cde.pth',
@@ -17,6 +18,7 @@ model_urls = {
     'resnet101': 'https://download.pytorch.org/models/resnet101-5d3b4d8f.pth',
     'resnet152': 'https://download.pytorch.org/models/resnet152-b121ed2d.pth',
 }
+
 
 
 class PyramidFeatures(nn.Module):
@@ -47,24 +49,27 @@ class PyramidFeatures(nn.Module):
     def forward(self, inputs):
         C3, C4, C5 = inputs
 
-        P5_x = self.P5_1(C5)
-        P5_upsampled_x = self.P5_upsampled(P5_x)
-        P5_x = self.P5_2(P5_x)
+        P5_x = self.P5_1(C5)  #32
+        P5_upsampled_x = self.P5_upsampled(P5_x) #64
+        P5_x = self.P5_2(P5_x) #32
 
-        P4_x = self.P4_1(C4)
-        P4_x = P5_upsampled_x + P4_x
-        P4_upsampled_x = self.P4_upsampled(P4_x)
-        P4_x = self.P4_2(P4_x)
+        P4_x = self.P4_1(C4) #64
+        P4_x = P5_upsampled_x + P4_x #64
+        P4_upsampled_x = self.P4_upsampled(P4_x) #128
+        P4_x = self.P4_2(P4_x) #64
 
-        P3_x = self.P3_1(C3)
-        P3_x = P3_x + P4_upsampled_x
-        P3_x = self.P3_2(P3_x)
+        P3_x = self.P3_1(C3) #128
+        P3_x = P3_x + P4_upsampled_x #128
+        P3_x = self.P3_2(P3_x) #128
 
-        P6_x = self.P6(C5)
+        P6_x = self.P6(C5) #16
 
-        P7_x = self.P7_1(P6_x)
-        P7_x = self.P7_2(P7_x)
-
+        P7_x = self.P7_1(P6_x) #16
+        P7_x = self.P7_2(P7_x) #8
+        print(f'P3_x {P3_x.shape}')
+        print(f'P4_x {P4_x.shape}')
+        print(f'P5_x {P5_x.shape}')
+        # print('!')
         return [P3_x, P4_x, P5_x, P6_x, P7_x]
 
 
@@ -151,6 +156,7 @@ class ClassificationModel(nn.Module):
         batch_size, width, height, channels = out1.shape
 
         out2 = out1.view(batch_size, width, height, self.num_anchors, self.num_classes)
+        print(out2.contiguous().view(x.shape[0], -1, self.num_classes).shape)
 
         return out2.contiguous().view(x.shape[0], -1, self.num_classes)
 
@@ -160,10 +166,10 @@ class ResNet(nn.Module):
     def __init__(self, num_classes, block, layers, inputs = 3, oan_gamma = 2, oan_alpha = 0.25):
         self.inplanes = 64
         super(ResNet, self).__init__()
-        self.conv1 = nn.Conv2d(inputs, 64, kernel_size=7, stride=2, padding=3, bias=False)
+        self.conv1 = nn.Conv2d(inputs, 64, kernel_size=7, stride=2, padding=3, bias=False) 
         self.bn1 = nn.BatchNorm2d(64)
         self.relu = nn.ReLU(inplace=True)
-        self.maxpool = nn.MaxPool2d(kernel_size=3, stride=2, padding=1)
+        self.maxpool = nn.MaxPool2d(kernel_size=3, stride=2, padding=1) 
         self.layer1 = self._make_layer(block, 64, layers[0])
         self.layer2 = self._make_layer(block, 128, layers[1], stride=2)
         self.layer3 = self._make_layer(block, 256, layers[2], stride=2)
@@ -227,6 +233,19 @@ class ResNet(nn.Module):
         self.regressionModel.output.bias.data.fill_(0)
 
         self.freeze_bn() #freeze BatchNorm2d
+        
+        
+        # self.zero_tensor_for_comp = torch.tensor(0, device = torch.device('cuda'))
+        # self.max_scores_buf = torch.zeros(100).cuda()
+        # self.filtered_boxes_buf = torch.zeros(100,4).cuda()
+        
+        
+        # self.register_buffer('max_scores_buf', torch.tensor([0]*100))
+        # self.register_buffer('filtered_boxes_buf', torch.tensor([[0]*4 for _ in range(100)]))
+        # self.max_scores_buf = self.max_scores_buf * 0 
+        # self.filtered_boxes_buf = self.filtered_boxes_buf * 0 
+
+    
 
     def _make_layer(self, block, planes, blocks, stride=1):
         downsample = None
@@ -257,20 +276,21 @@ class ResNet(nn.Module):
         else:
             img_batch = inputs
 
-        x = self.conv1(img_batch)
-        x = self.bn1(x)
-        x = self.relu(x)
-        x = self.maxpool(x)
 
-        x1 = self.layer1(x)
-        x2 = self.layer2(x1)
-        x3 = self.layer3(x2)
-        x4 = self.layer4(x3)
-        
+        x = self.conv1(img_batch)  #-> 512x512x64
+        x = self.bn1(x)            
+        x = self.relu(x)
+        x = self.maxpool(x)        #-> 256x256x64
+
+        x1 = self.layer1(x)     #256
+        x2 = self.layer2(x1)    #128
+        x3 = self.layer3(x2)    #64
+        x4 = self.layer4(x3)    #32
+
         x_oan = self.oan_layer1(x4)
         x_oan = self.oan_layer2(x_oan)
         x_oan = self.oan_layer3(x_oan)
-        
+ 
         # if not self.training:
             
 

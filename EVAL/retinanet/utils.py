@@ -110,6 +110,7 @@ class BBoxTransform(nn.Module):
         dy = deltas[:, :, 1] * self.std[1] + self.mean[1]
         dw = deltas[:, :, 2] * self.std[2] + self.mean[2]
         dh = deltas[:, :, 3] * self.std[3] + self.mean[3]
+        
 
         pred_ctr_x = ctr_x + dx * widths
         pred_ctr_y = ctr_y + dy * heights

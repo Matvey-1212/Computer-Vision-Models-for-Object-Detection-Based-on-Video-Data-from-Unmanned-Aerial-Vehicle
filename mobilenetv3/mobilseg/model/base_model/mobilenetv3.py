@@ -6,8 +6,10 @@ from mobilseg.nn import Hswish, ConvBNHswish, Bottleneck, SEModule
 __all__ = ['MobileNetV3', 'get_mobilenet_v3', 'mobilenet_v3_large_1_0', 'mobilenet_v3_small_1_0']
 
 
+
+
 class MobileNetV3(nn.Module):
-    def __init__(self, nclass=1000, mode='large', width_mult=1.0, dilated=False, norm_layer=nn.BatchNorm2d):
+    def __init__(self, nclass=1000, mode='large', width_mult=1.0, dilated=False, norm_layer=nn.BatchNorm2d, attention = False):
         super(MobileNetV3, self).__init__()
         if mode == 'large':
             layer1_setting = [
@@ -57,17 +59,32 @@ class MobileNetV3(nn.Module):
         # building bottleneck blocks
         self.layer1, input_channels = self._make_layer(Bottleneck, input_channels, layer1_setting,
                                                        width_mult, norm_layer=norm_layer)
+        
+        output_channels = input_channels
+        
         self.layer2, input_channels = self._make_layer(Bottleneck, input_channels, layer2_setting,
                                                        width_mult, norm_layer=norm_layer)
+        
         self.layer3, input_channels = self._make_layer(Bottleneck, input_channels, layer3_setting,
                                                        width_mult, norm_layer=norm_layer)
-        if dilated:
-            self.layer4, input_channels = self._make_layer(Bottleneck, input_channels, layer4_setting,
-                                                           width_mult, dilation=2, norm_layer=norm_layer)
+        
+        if attention:
+            if dilated:
+                self.layer4, input_channels = self._make_layer(Bottleneck, input_channels + output_channels, layer4_setting,
+                                                            width_mult, dilation=2, norm_layer=norm_layer)
+            else:
+                self.layer4, input_channels = self._make_layer(Bottleneck, input_channels + output_channels, layer4_setting,
+                                                            width_mult, norm_layer=norm_layer)
         else:
-            self.layer4, input_channels = self._make_layer(Bottleneck, input_channels, layer4_setting,
-                                                           width_mult, norm_layer=norm_layer)
+            if dilated:
+                self.layer4, input_channels = self._make_layer(Bottleneck, input_channels, layer4_setting,
+                                                            width_mult, dilation=2, norm_layer=norm_layer)
+            else:
+                self.layer4, input_channels = self._make_layer(Bottleneck, input_channels, layer4_setting,
+                                                            width_mult, norm_layer=norm_layer)
 
+
+        
         # building last several layers
         classifier = list()
         if mode == 'large':
@@ -88,6 +105,23 @@ class MobileNetV3(nn.Module):
         else:
             raise ValueError('Unknown mode.')
         self.classifier = nn.Sequential(*classifier)
+        
+        self.oan_layer1 = nn.Conv2d(in_channels=last_bneck_channels,  
+                                    out_channels=256,  
+                                    kernel_size=3,     
+                                    stride=2,          
+                                    padding=1) 
+        
+        self.oan_layer2 = nn.Conv2d(in_channels=256, 
+                                    out_channels=512,  
+                                    kernel_size=1,     
+                                    stride=1,          
+                                    padding=0) 
+        self.oan_layer3 = nn.Conv2d(in_channels=512,  
+                                    out_channels=1,  
+                                    kernel_size=1,     
+                                    stride=1,          
+                                    padding=0) 
 
         self._init_weights()
 

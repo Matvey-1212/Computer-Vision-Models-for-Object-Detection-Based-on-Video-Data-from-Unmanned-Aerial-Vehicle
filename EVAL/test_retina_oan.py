@@ -2,6 +2,7 @@ import os
 import time
 import numpy as np
 import pandas as pd
+import datetime
 
 import torch
 import torch.optim as optim
@@ -14,6 +15,7 @@ from utils.dataloader import ToTorch, Augmenter, Normalizer, Resizer
 from retinanet import model_oan
 from metrics import evaluate
 
+print('Started')
 
 
 test_df = [{'dataframe': pd.read_csv('/home/maantonov_1/VKR/data/main_data/test/test_main.csv'),
@@ -25,7 +27,7 @@ score_threshold = 0.05
 #              'image_dir': '/home/maantonov_1/VKR/data/crope_data/main/crop_val_1024/images'}]
 
 
-test_dataset = LADD(test_df, mode = "valid", smart_crop = True, new_shape = (1024,1024), transforms = T.Compose([Normalizer(), Resizer()]))
+test_dataset = LADD(test_df, mode = "valid", smart_crop = True, new_shape = (1024,1024), transforms = T.Compose([Normalizer(), ToTorch()]))#, Resizer()]))
 
 print(f'dataset Created', flush=True)
 
@@ -37,9 +39,11 @@ print(f'Crreating retinanet ===>', flush=True)
 
 
 
-path_to_weights = '/home/maantonov_1/VKR/weights/retinanet/2024-03-15/gamma1_alpha0.01/2024-03-15_retinanet_oan_vis+small+ful_lr:0.0003_step:5_gamma:1_alpha:0.01_n14_m:0.51_f:0.55_val:0.2638_last.pt'
+path_to_weights = '/home/maantonov_1/VKR/weights/retinanet/10_03_2024/retinanet_oan_vis+small_lr+ful_lr0.0003_step5_gamma2_alpha0.1_12_0.48438382037660715_0.5626141205112599.pt'
 
 retinanet = torch.load(path_to_weights, map_location=device)
+
+# retinanet = model_oan.resnet50(num_classes = 2, pretrained = False, inputs = 3)
 
 if torch.cuda.is_available():
     retinanet = torch.nn.DataParallel(retinanet).cuda()
@@ -82,11 +86,11 @@ for i in range(len(test_dataset)):
         annot = data['annot']
         
         t = time.time()
-        scores, labels, boxes = retinanet(img.permute(2, 0, 1).to(device).float().unsqueeze(dim=0))
+        scores,  labels, boxes = retinanet(img.permute(2, 0, 1).to(device).float().unsqueeze(dim=0)) #labels,
         t1 = time.time()
         
     time_running.append(t1-t)
-    print(f'    time: {t1-t}')
+    print(f'\n    time: {t1-t}')
     
     pred_dict = {}
     scores = scores.cpu().numpy()
@@ -109,7 +113,8 @@ for i in range(len(test_dataset)):
     
 
     prediction.append((gt_dict, pred_dict))
-    
+    if i >= 3:
+        break
     
 map_score, Fscore = evaluate(prediction, score_threshold = score_threshold)
 

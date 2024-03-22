@@ -252,11 +252,14 @@ class LADD(Dataset):
         height = records['height'].values.astype(int)
         boxes = self.data_format_min_max(records[['x', 'y', 'w', 'h']].values, width, height)
         
-        if self.for_sahi:
-            path = f'{image_dir}/{image_id}{self.img_endwith}'
-            return path, boxes
         
         image = cv2.imread(f'{image_dir}/{image_id}{self.img_endwith}', cv2.IMREAD_COLOR)
+        
+        if self.for_sahi:
+            image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
+            return image, boxes
+        
+        
         if self.from_255_to_1:
             image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB).astype(np.float32)
             image /= 255.0

@@ -56,6 +56,37 @@ class Weighted_Cross_Entropy_Loss(torch.nn.Module):
 
         return weighted_loss
     
+class Weighted_Cross_Entropy_Loss1(torch.nn.Module):
+    """Cross entropy loss that uses weight maps."""
+
+    def __init__(self, w_1 = 50, w_2 = 1):
+        super(Weighted_Cross_Entropy_Loss1, self).__init__()
+        self.w_1 = w_1
+        self.w_2 = w_2
+
+    def forward(self, pred, target):#, weights
+        n, c, H, W = pred.shape
+        
+        P = torch.sigmoid(pred)
+        
+        P = torch.clamp(P, 1e-7, 1.0 - 1e-7)
+
+        logp = torch.log(P)
+        
+
+        w_1 = self.w_1
+        w_2 = self.w_2
+        
+        weights = (target * (w_1 - w_2) + w_2)/(w_1 + w_2)
+
+        weighted_logp = (logp * weights).view(n, -1)
+
+        weighted_loss = weighted_logp.sum(1) / weights.view(n, -1).sum(1)
+
+        weighted_loss = -weighted_loss.mean()
+
+        return weighted_loss
+    
 class OAN_Focal_Loss(torch.nn.Module):
     """Cross entropy loss that uses weight maps."""
 
@@ -68,18 +99,23 @@ class OAN_Focal_Loss(torch.nn.Module):
     def forward(self, pred, target):#, weights
         
         
-        n, c, H, W = pred.shape
+        # n, c, H, W = pred.shape
         
-        soft_p = F.softmax(pred, dim=1)
+        P = torch.sigmoid(pred)
         
-        P = torch.gather(soft_p, 1, target.view(n, 1, H, W))
+        P = torch.clamp(P, 1e-7, 1.0 - 1e-7)
 
-        log = self.alpha * (1 - P) ** self.gamma * torch.log(P + 1e-6)
 
-        # Average over mini-batch
+        log = target * self.alpha * (1 - P) ** self.gamma * torch.log(P) + target * (1 - self.alpha) * (P) ** self.gamma * torch.log(1 - P)
+
+
+        
         log = -log.mean()
 
         return log
+    
+
+        
     
 class IOU_loss(torch.nn.Module):
     """Cross entropy loss that uses weight maps."""
