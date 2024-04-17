@@ -205,9 +205,9 @@ class OANFocalLoss(nn.Module):
         alpha_factor = torch.cat((1 - alpha_factor, alpha_factor), 1).cuda()
         
         
-        
+
         target_map = torch.zeros((n, 1, H, W)).cuda().long()
-        
+
 
         for i in range(n):
             for annot in annotations[i]:

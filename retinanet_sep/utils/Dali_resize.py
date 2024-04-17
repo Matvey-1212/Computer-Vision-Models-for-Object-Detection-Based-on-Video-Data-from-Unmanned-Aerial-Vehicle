@@ -109,22 +109,22 @@ def resize_bb(bboxes_tensor, sizes, bb_pad = 0.0 ,new_shape = (1024, 1024)):
             dx = bboxes_tensor[i][j][2] - bboxes_tensor[i][j][0]
             dy = bboxes_tensor[i][j][3] - bboxes_tensor[i][j][1]
             
-            bboxes_tensor[i][j][0] = max(0, min(int(bboxes_tensor[i][j][0] * w_c - bb_pad * dx), width))
-            bboxes_tensor[i][j][1] = max(0, min(int(bboxes_tensor[i][j][1] * h_c - bb_pad * dy), height))
-            bboxes_tensor[i][j][2] = max(0, min(int(bboxes_tensor[i][j][2] * w_c + bb_pad * dx), width))
-            bboxes_tensor[i][j][3] = max(0, min(int(bboxes_tensor[i][j][3] * h_c + bb_pad * dy), height))
+            bboxes_tensor[i][j][0] = max(0, min(int(bboxes_tensor[i][j][0] * w_c - bb_pad * dx * w_c), width))
+            bboxes_tensor[i][j][1] = max(0, min(int(bboxes_tensor[i][j][1] * h_c - bb_pad * dy * h_c), height))
+            bboxes_tensor[i][j][2] = max(0, min(int(bboxes_tensor[i][j][2] * w_c + bb_pad * dx * w_c), width))
+            bboxes_tensor[i][j][3] = max(0, min(int(bboxes_tensor[i][j][3] * h_c + bb_pad * dy * h_c), height))
     return bboxes_tensor
 
 @pipeline_def( device_id=0)
-def get_dali_pipeline_aug(images_dir, annotations_file, resize_dims=(1024, 1024)):
+def get_dali_pipeline_aug(images_dir, annotations_file, resize_dims=(1024, 1024), seed = 42):
     inputs, bboxes, labels, img_id = fn.readers.coco(
         file_root=images_dir,
         annotations_file=annotations_file,
         ltrb=True,
         random_shuffle=True,
         image_ids = True,
-        name="Reader"
-        # seed = 42
+        name="Reader",
+        seed = seed
     )
     
 
@@ -136,18 +136,18 @@ def get_dali_pipeline_aug(images_dir, annotations_file, resize_dims=(1024, 1024)
     
 
     
-    images = fn.color_twist(images, brightness=fn.random.uniform(range=(0.7, 1.3)),
-                            contrast=fn.random.uniform(range=(0.7, 1.3)) , 
-                            saturation=fn.random.uniform(range=(0.7, 1.3)),
-                            hue=fn.random.uniform(range=(-0.1, 0.3)), device='gpu')
+    images = fn.color_twist(images, brightness=fn.random.uniform(range=(0.7, 1.3), seed=seed+1),
+                            contrast=fn.random.uniform(range=(0.7, 1.3), seed=seed+2) , 
+                            saturation=fn.random.uniform(range=(0.7, 1.3), seed=seed+3),
+                            hue=fn.random.uniform(range=(-0.1, 0.3), seed=seed+4), device='gpu')
     
-    images = fn.gaussian_blur(images, sigma=fn.random.uniform(range=(0.3, 1.7)), device='gpu')
+    images = fn.gaussian_blur(images, sigma=fn.random.uniform(range=(0.3, 1.7), seed=seed+5), device='gpu')
     
-    images = fn.noise.gaussian(images, stddev=fn.random.uniform(range=(1.0, 10.0)), device='gpu')
+    images = fn.noise.gaussian(images, stddev=fn.random.uniform(range=(1.0, 10.0), seed=seed+6), device='gpu')
 
 
-    horizontal_flip = fn.random.coin_flip(probability=0.5)  
-    vertical_flip = fn.random.coin_flip(probability=0.5)  
+    horizontal_flip = fn.random.coin_flip(probability=0.5, seed=seed+7)  
+    vertical_flip = fn.random.coin_flip(probability=0.5, seed=seed+8)  
     images = fn.flip(images, horizontal=horizontal_flip, vertical=vertical_flip, device='gpu')
     # bboxes = fn.bb_flip(bboxes, horizontal=horizontal_flip, vertical=vertical_flip, ltrb=True)
     
@@ -159,9 +159,39 @@ def get_dali_pipeline_aug(images_dir, annotations_file, resize_dims=(1024, 1024)
                                       std=std, device='gpu')
     return images, bboxes, bbox_shapes, img_id, horizontal_flip, vertical_flip, original_sizes
 
+@pipeline_def( device_id=0)
+def get_dali_pipeline_small_aug(images_dir, annotations_file, resize_dims=(1024, 1024), seed = 42):
+    inputs, bboxes, labels, img_id = fn.readers.coco(
+        file_root=images_dir,
+        annotations_file=annotations_file,
+        ltrb=True,
+        random_shuffle=True,
+        image_ids = True,
+        name="Reader",
+        seed = seed
+    )
+    
+
+    original_sizes = fn.peek_image_shape(inputs)
+    images = fn.decoders.image(inputs, device="mixed", output_type=types.RGB)
+
+    images = fn.resize(images, resize_x=resize_dims[0], resize_y=resize_dims[1])
+
+
+    horizontal_flip = fn.random.coin_flip(probability=0.5, seed=seed+7)  
+    vertical_flip = fn.random.coin_flip(probability=0.5, seed=seed+8)  
+    images = fn.flip(images, horizontal=horizontal_flip, vertical=vertical_flip, device='gpu')
+    # bboxes = fn.bb_flip(bboxes, horizontal=horizontal_flip, vertical=vertical_flip, ltrb=True)
+    
+    bbox_shapes = fn.shapes(bboxes)
+    bboxes = fn.pad(bboxes, fill_value=-1, axes=(0,1), shape=(60,4))
+
+    images = fn.crop_mirror_normalize(images,device='gpu')
+    return images, bboxes, bbox_shapes, img_id, horizontal_flip, vertical_flip, original_sizes
+
 
 @pipeline_def( device_id=0)
-def get_dali_pipeline(images_dir, annotations_file, resize_dims=(1024, 1024)):
+def get_dali_pipeline(images_dir, annotations_file, resize_dims=(1024, 1024), seed = 42):
     inputs, bboxes, labels, img_id = fn.readers.coco(
         file_root=images_dir,
         annotations_file=annotations_file,
@@ -169,7 +199,7 @@ def get_dali_pipeline(images_dir, annotations_file, resize_dims=(1024, 1024)):
         random_shuffle=False,
         image_ids = True,
         name="Reader",
-        seed = 42
+        seed = seed
     )
     original_sizes = fn.peek_image_shape(inputs)
     images = fn.decoders.image(inputs, device="mixed", output_type=types.RGB)

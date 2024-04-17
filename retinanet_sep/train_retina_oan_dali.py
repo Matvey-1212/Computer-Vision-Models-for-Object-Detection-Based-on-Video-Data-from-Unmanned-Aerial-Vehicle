@@ -37,7 +37,7 @@ epochs = 30
 batch_size = 14
 num_workers = 2
 oan_gamma = 2
-oan_alpha = 0.5
+oan_alpha = 0.01
 
 #optimazer
 start_lr   = 0.0003
@@ -63,19 +63,20 @@ path_to_save = path_to_save + weights_name
 print(f'path_to_save {path_to_save}')
 
 
-path_to_weights = '/home/maantonov_1/VKR/weights/retinanet/visdrone/retinanet_oan_vis_lr0.0003_step_5_gamma:2_alpha:0.25_n29_m:0.00_f:0.02_last.pt'
+# path_to_weights = '/home/maantonov_1/VKR/weights/retinanet/visdrone/retinanet_oan_vis_lr0.0003_step_5_gamma:2_alpha:0.25_n29_m:0.00_f:0.02_last.pt'
+path_to_weights = '/home/maantonov_1/VKR/weights/retinanet/small/2024-03-18/gamma2_alpha0.05/2024-03-18_retinanet_oan_vis+small_lr:0.0003_step:10_gamma:2_alpha:0.05_n29_m:0.14_f:0.12_val:0.6817_last.pt'
 
 os.environ["WANDB_MODE"]="offline" 
 wandb.init(project="VKR", entity="matvey_antonov", name = f"{weights_name}")
 
 
-# main_dir = '/home/maantonov_1/VKR/data/crope_data/main/crop_train_1024/'
-main_dir = '/home/maantonov_1/VKR/data/crope_data/small/small_crop_train/'
+main_dir = '/home/maantonov_1/VKR/data/crope_data/main/crop_train_1024/'
+# main_dir = '/home/maantonov_1/VKR/data/crope_data/small/small_crop_train/'
 images_dir_tarin = main_dir + 'images'
 annotations_file_train = main_dir + 'annotations/annot.json'
 
-# main_dir = '/home/maantonov_1/VKR/data/crope_data/main/crop_val_1024/'
-main_dir = '/home/maantonov_1/VKR/data/crope_data/small/small_crop_val/'
+main_dir = '/home/maantonov_1/VKR/data/crope_data/main/crop_val_1024/'
+# main_dir = '/home/maantonov_1/VKR/data/crope_data/small/small_crop_val/'
 images_dir_val = main_dir + 'images'
 annotations_file_val = main_dir + 'annotations/annot.json'
 
@@ -108,10 +109,10 @@ torch.cuda.empty_cache()
 print('CUDA available: {}'.format(torch.cuda.is_available()), flush=True)
 print(f'Crreating retinanet ===>', flush=True)
 
-retinanet = model_oan.resnet50(num_classes = 2, pretrained = False, inputs = 3)
+# retinanet = model_oan.resnet50(num_classes = 2, pretrained = False, inputs = 3)
 
 
-# retinanet = torch.load(path_to_weights, map_location=device)
+retinanet = torch.load(path_to_weights, map_location=device)
 
 retinanet.focalLoss = losses.FocalLoss(alpha = oan_alpha, gamma = oan_gamma)
 retinanet.oan_loss = losses.OANFocalLoss(alpha = oan_alpha, gamma = oan_gamma)

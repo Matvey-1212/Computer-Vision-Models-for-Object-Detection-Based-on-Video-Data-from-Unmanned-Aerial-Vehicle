@@ -4,11 +4,9 @@ import numpy as np
 import pandas as pd
 import random
 import datetime
-import math
 
 import wandb
 import torch
-import torch.nn as nn
 import torch.optim as optim
 
 from torch.utils.data import DataLoader
@@ -16,6 +14,8 @@ import torchvision.transforms as transforms
 import torchvision.transforms as T
 import torchvision.transforms.functional as F
 import albumentations as A
+import torch.nn as nn
+import kornia 
 
 from nvidia.dali.pipeline import pipeline_def
 import nvidia.dali.types as types
@@ -24,33 +24,31 @@ from nvidia.dali.plugin.pytorch import DALIGenericIterator, LastBatchPolicy
 
 from utils.datasetLADD import LADD
 from utils.dataloader import collater_annot, ToTorch, Augmenter, Normalizer, Resizer
-from utils.Dali_resize import get_dali_pipeline, get_dali_pipeline_aug, flip_bboxes2, flip_bboxes, resize_bb
+from utils.Dali_resize import get_dali_pipeline, get_dali_pipeline_aug,get_dali_pipeline_small_aug, flip_bboxes2, flip_bboxes, resize_bb
 from utils.metrics import evaluate
-from retinanet import model_oan, model_incpetion
+from utils.copypaste import CopyPasteAugmentation
+from retinanet import model_oan
 from retinanet import losses
-from retinanet import aploss
 
 
 # import torch.autograd
 # torch.autograd.set_detect_anomaly(True)
 
-test_id = '11'
 
 
-epochs = 15
+epochs = 30
 batch_size = 8
 num_workers = 2
 oan_gamma = 2
-oan_alpha = 0.25
-resize_to = (1312, 1312)
+oan_alpha = 0.01
+resize_to = (1024, 1024)
 bb_pad = 0.5
 model_name = f'retinanet_oan_resize_h:{resize_to[0]}_w:{resize_to[1]}'
 
 #optimazer
-start_lr   = 0.0001
-num_steps  = 5
+start_lr   = 0.0003
+num_steps  = 10
 gamma_coef = 0.5
-
 
 print(f'epochs {epochs}')
 print(f'batch_size {batch_size}')
@@ -62,11 +60,11 @@ print(f'num_steps {num_steps}')
 print(f'gamma_coef {gamma_coef}')
 print(f'resize_to {resize_to}')
 
-print(f'id {test_id}')
+print('ретина на more summer предобученная')
 
 weights_name = f'{datetime.date.today().isoformat()}_{model_name}_vis+small+main_lr:{start_lr}_step:{num_steps}_gamma:{oan_gamma}_alpha:{oan_alpha}'
 # weights_name = f'{datetime.date.today().isoformat()}_retinanet_oan_vis+small_lr_lr{start_lr}_step{num_steps}_gamma{oan_gamma}_alpha{oan_alpha}'
-path_to_save = f'/home/maantonov_1/VKR/weights/retinanet/resize/test/main{bb_pad}/{datetime.date.today().isoformat()}/gamma{oan_gamma}_alpha{oan_alpha}/'
+path_to_save = f'/home/maantonov_1/VKR/weights/retinanet/resize/main/{datetime.date.today().isoformat()}/gamma{oan_gamma}_alpha{oan_alpha}/'
 if not os.path.exists(path_to_save):
     os.makedirs(path_to_save)
 path_to_save = path_to_save + weights_name
@@ -102,7 +100,7 @@ annotations_file_test = main_dir + 'annotations/annot.json'
 
 
 dali_iterator_train = DALIGenericIterator(
-    pipelines=[get_dali_pipeline_aug(images_dir = images_dir_tarin, annotations_file = annotations_file_train, resize_dims = resize_to, batch_size = batch_size, num_threads = num_workers)],
+    pipelines=[get_dali_pipeline_small_aug(images_dir = images_dir_tarin, annotations_file = annotations_file_train, resize_dims = resize_to, batch_size = batch_size, num_threads = num_workers)],
     output_map=['data', 'bboxe', 'bbox_shapes', 'img_id', 'horizontal_flip','vertical_flip', 'original_sizes'],
     reader_name='Reader',
     last_batch_policy=LastBatchPolicy.PARTIAL,
@@ -131,6 +129,17 @@ dali_iterator_test = DALIGenericIterator(
 print(f'dataset Created', flush=True)
 
 
+transform = nn.Sequential(
+    kornia.augmentation.ColorJitter(brightness=0.2, contrast=0.2, saturation=0.2, hue = 0.01, p=0.3),
+    kornia.augmentation.RandomGaussianNoise(mean=0., std=0.05, p=.1),
+    kornia.augmentation.RandomMedianBlur(kernel_size=(3, 7), p=0.2),
+    kornia.augmentation.RandomMotionBlur(kernel_size=(3, 7),angle=25., direction=(-1,1), p = 0.2),
+    kornia.augmentation.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
+)
+
+
+path = ['/home/maantonov_1/VKR/data/copypaste/resize_crop_main']#,'/home/maantonov_1/VKR/data/copypaste/resize_crop_small']
+cp = CopyPasteAugmentation(path, max_objects = 3, random_state = None, feather_amount = 31, bb_pad = bb_pad)
 
 
 device = torch.device('cuda') if torch.cuda.is_available() else torch.device('cpu')
@@ -138,13 +147,13 @@ torch.cuda.empty_cache()
 print('CUDA available: {}'.format(torch.cuda.is_available()), flush=True)
 print(f'Crreating retinanet ===>', flush=True)
 
-retinanet = model_incpetion.resnet50(num_classes = 2, pretrained = False, inputs = 3)
+# retinanet = model_oan.resnet50(num_classes = 2, pretrained = False, inputs = 3)
 
 
-# retinanet = torch.load(path_to_weights, map_location=device)
+retinanet = torch.load(path_to_weights, map_location=device)
 
 retinanet.focalLoss = losses.FocalLoss(alpha = oan_alpha, gamma = oan_gamma)
-retinanet.aploss = aploss.APLoss.apply
+retinanet.oan_loss = losses.OANFocalLoss(alpha = oan_alpha, gamma = oan_gamma)
 
 
 optimizer = optim.AdamW(retinanet.parameters(), lr = start_lr)
@@ -184,37 +193,34 @@ def train_one_epoch(epoch_num, train_data_loader):
         new_elements = torch.where(bbox[:, :, 3] == -1, -1, 1).unsqueeze(2)  
         annot = torch.cat((bbox, new_elements), dim=2).to(device)
         
+        img, annot = cp.apply_augmentation(img, annot)
+        img = transform(img)
         
-        classification_loss, regression_loss = retinanet([img, annot])
+        classification_loss, regression_loss, oan_loss, _ = retinanet([img, annot])
                 
         classification_loss = classification_loss.mean()
         regression_loss = regression_loss.mean()
-        # class_loss_ap = class_loss_ap.mean()
-        # reg_loss_ap = reg_loss_ap.mean()
 
-
-        loss = classification_loss + regression_loss #+ 4 * oan_loss #+ class_loss_ap #+ reg_loss_ap
-        oan_loss = 0
+        loss = classification_loss + regression_loss + 4 * oan_loss
+        
 
         if bool(loss == 0):
-            # print(
-            # 'Epoch: {} | Iteration: {} | Classification loss: {:1.5f} | Regression loss: {:1.5f} | oan loss: {:1.5f} | Running loss: {:1.5f}'.format(
-            #     epoch_num, iter_num, float(classification_loss), float(regression_loss), float(oan_loss), np.mean(epoch_loss)), flush=True)
+            print(
+            'Epoch: {} | Iteration: {} | Classification loss: {:1.5f} | Regression loss: {:1.5f} | oan loss: {:1.5f} | Running loss: {:1.5f}'.format(
+                epoch_num, iter_num, float(classification_loss), float(regression_loss), float(oan_loss), np.mean(epoch_loss)), flush=True)
             continue
                 
         loss.backward()
 
-        torch.nn.utils.clip_grad_norm_(retinanet.parameters(), max_norm=2.0)
-        
-        torch.nn.utils.clip_grad_value_(retinanet.parameters(), clip_value=0.5)
+        torch.nn.utils.clip_grad_norm_(retinanet.parameters(), 0.1)
                 
         optimizer.step()
         epoch_loss.append(float(loss))
 
-        if iter_num % 10 == 0:
-            print(
-                'Epoch: {} | Iteration: {} | Classification loss: {:1.5f} | Regression loss: {:1.5f} | oan loss: {:1.5f} | Running loss: {:1.5f}'.format(
-                    epoch_num, iter_num, float(classification_loss), float(regression_loss), float(oan_loss), np.mean(epoch_loss)), flush=True)
+            
+        print(
+            'Epoch: {} | Iteration: {} | Classification loss: {:1.5f} | Regression loss: {:1.5f} | oan loss: {:1.5f} | Running loss: {:1.5f}'.format(
+                epoch_num, iter_num, float(classification_loss), float(regression_loss), float(oan_loss), np.mean(epoch_loss)), flush=True)
         
         del classification_loss
         del regression_loss
@@ -251,23 +257,19 @@ def valid_one_epoch(epoch_num, valid_data_loader):
             new_elements = torch.where(bbox[:, :, 3] == -1, -1, 1).unsqueeze(2)  
             annot = torch.cat((bbox, new_elements), dim=2).to(device)
             
-            classification_loss, regression_loss = retinanet([img, annot])
-                
+            classification_loss, regression_loss, oan_loss, _ = retinanet([img, annot])
+                    
             classification_loss = classification_loss.mean()
             regression_loss = regression_loss.mean()
-            # class_loss_ap = class_loss_ap.mean()
-            # reg_loss_ap = reg_loss_ap.mean()
+            
 
-
-            loss = classification_loss + regression_loss #+ 4 * oan_loss #+ class_loss_ap #+ reg_loss_ap
-            oan_loss = 0
+            loss = classification_loss + regression_loss + 4 * oan_loss
 
             epoch_loss.append(float(loss))
 
-            if iter_num % 10 == 0:
-                print(
-                    'Epoch: {} | Iteration: {} | Classification loss: {:1.5f} | Regression loss: {:1.5f} | oan loss: {:1.5f}  | Running loss: {:1.5f}'.format(
-                        epoch_num, iter_num, float(classification_loss), float(regression_loss), float(oan_loss), np.mean(epoch_loss)), flush=True)
+            print(
+            'Epoch: {} | Iteration: {} | Classification loss: {:1.5f} | Regression loss: {:1.5f} | oan loss: {:1.5f} | Running loss: {:1.5f}'.format(
+                epoch_num, iter_num, float(classification_loss), float(regression_loss), float(oan_loss), np.mean(epoch_loss)), flush=True)
         
         del classification_loss
         del regression_loss

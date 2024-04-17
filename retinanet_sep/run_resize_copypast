@@ -1,7 +1,7 @@
 #!/bin/bash
-#SBATCH --job-name=train_retina_oan_new_layer_resize_dali              # Название задачи
-#SBATCH --error=train_retina_oan_new_layer_resize_dali-%j.err          # Файл для вывода ошибок
-#SBATCH --output=train_retina_oan_new_layer_resize_dali-%j.log         # Файл для вывода результатов
+#SBATCH --job-name=train_retina_oan_resize_dali_copypast              # Название задачи
+#SBATCH --error=train_retina_oan_resize_dali_copypast-%j.err          # Файл для вывода ошибок
+#SBATCH --output=train_retina_oan_resize_dali_copypast-%j.log         # Файл для вывода результатов
 #SBATCH --time=40:00:00              # Максимальное время выполнения
 #SBATCH --ntasks=1                   # Количество MPI процессов
 #SBATCH --nodes=1                    # Требуемое кол-во узлов
@@ -14,4 +14,4 @@ module load Python
 source deactivate
 source activate retinanet
 
-python -u train_retina_oan_new_layer_resize_dali.py
+python -u train_retina_oan_resize_dali_copypast.py

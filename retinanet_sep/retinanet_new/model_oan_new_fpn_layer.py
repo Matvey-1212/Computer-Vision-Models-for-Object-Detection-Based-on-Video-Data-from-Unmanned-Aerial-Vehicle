@@ -77,7 +77,7 @@ class PyramidFeatures(nn.Module):
         P7_x = self.P7_1(P6_x)
         P7_x = self.P7_2(P7_x)
 
-        return [P2_x, P3_x, P4_x, P5_x, P6_x, P7_x]
+        return [P2_x, P3_x, P4_x, P5_x]#, P6_x, P7_x]
 
 
 class RegressionModel(nn.Module):
@@ -216,7 +216,7 @@ class ResNet(nn.Module):
         self.regressionModel = RegressionModel(256)
         self.classificationModel = ClassificationModel(256, num_classes=self.num_classes)
 
-        self.anchors = Anchors(pyramid_levels = [2, 3, 4, 5, 6, 7])
+        self.anchors = Anchors(pyramid_levels = [2, 3, 4, 5]) #[2, 3, 4, 5, 6, 7]
 
         self.regressBoxes = BBoxTransform()
 

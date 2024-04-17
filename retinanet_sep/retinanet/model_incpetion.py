@@ -19,6 +19,96 @@ model_urls = {
     'resnet152': 'https://download.pytorch.org/models/resnet152-b121ed2d.pth',
 }
 
+class Attention_block(nn.Module):
+    def __init__(self,F_g,F_l,F_int):
+        super(Attention_block,self).__init__()
+        self.W_g = nn.Sequential(
+            nn.Conv2d(F_g, F_int, kernel_size=1,stride=1,padding=0,bias=True),
+            nn.BatchNorm2d(F_int)
+            )
+        
+        self.W_x = nn.Sequential(
+            nn.Conv2d(F_l, F_int, kernel_size=1,stride=1,padding=0,bias=True),
+            nn.BatchNorm2d(F_int)
+        )
+
+        self.psi = nn.Sequential(
+            nn.Conv2d(F_int, 1, kernel_size=1,stride=1,padding=0,bias=True),
+            nn.BatchNorm2d(1),
+            nn.Sigmoid()
+        )
+        
+        self.relu = nn.ReLU(inplace=True)
+        
+    def forward(self,g,x):
+        g1 = self.W_g(g)
+        x1 = self.W_x(x)
+        psi = self.relu(g1+x1)
+        psi = self.psi(psi)
+
+        return x*psi
+
+class CustomPyramidFeaturesAT(nn.Module):
+    def __init__(self, C3_size, C4_size, C5_size, layers = [3,4,5,6,7], feature_size=256):
+        super(CustomPyramidFeaturesAT, self).__init__()
+        
+        self.layers = layers
+
+        # upsample C5 to get P5 from the FPN paper
+        self.P5_1_1 = nn.Conv2d(C5_size, feature_size//2, kernel_size=1, stride=1, padding=0)
+
+        
+        self.P5_upsampled = nn.Upsample(scale_factor=2, mode='nearest')
+
+        self.P5_2 = nn.Conv2d(feature_size//2, feature_size, kernel_size=3, stride=1, padding=1)
+
+        # add P5 elementwise to C4
+        self.P4_1_1 = nn.Conv2d(C4_size, feature_size//2, kernel_size=1, stride=1, padding=0)
+
+        
+        self.P4_upsampled = nn.Upsample(scale_factor=2, mode='nearest')
+
+        self.P4_2 = nn.Conv2d(feature_size, feature_size, kernel_size=3, stride=1, padding=1)
+
+        # add P4 elementwise to C3
+        self.P3_1_1 = nn.Conv2d(C3_size, feature_size, kernel_size=1, stride=1, padding=0)
+
+        
+        self.P3_2 = nn.Conv2d(feature_size * 2, feature_size, kernel_size=3, stride=1, padding=1)
+
+        # "P6 is obtained via a 3x3 stride-2 conv on C5"
+        self.P6 = nn.Conv2d(C5_size, feature_size, kernel_size=3, stride=2, padding=1)
+
+        # "P7 is computed by applying ReLU followed by a 3x3 stride-2 conv on P6"
+        self.P7_1 = nn.ReLU()
+        self.P7_2 = nn.Conv2d(feature_size, feature_size, kernel_size=3, stride=2, padding=1)
+
+
+# torch.cat((x3,d4),dim=1)
+    def forward(self, inputs):
+        C3, C4, C5 = inputs
+
+        P5_x = self.P5_1_1(C5)# + self.P5_1_3(C5) + self.P5_1_5(C5) 
+        P5_upsampled_x = self.P5_upsampled(P5_x)
+        P5_x = self.P5_2(P5_x)
+
+        P4_x = self.P4_1_1(C4) #+ self.P4_1_3(C4) + self.P4_1_5(C4) 
+        P4_x = torch.cat((P5_upsampled_x,P4_x),dim=1) #P5_upsampled_x + P4_x
+        P4_upsampled_x = self.P4_upsampled(P4_x)
+        P4_x = self.P4_2(P4_x)
+
+        P3_x = self.P3_1_1(C3) #+ self.P3_1_3(C3) + self.P3_1_5(C3) 
+        P3_x = torch.cat((P4_upsampled_x,P3_x),dim=1) #P3_x + P4_upsampled_x
+        P3_x = self.P3_2(P3_x)
+
+        P6_x = self.P6(C5)
+
+        P7_x = self.P7_1(P6_x)
+        P7_x = self.P7_2(P7_x)
+
+        
+        return [P3_x, P4_x, P5_x, P6_x, P7_x]
+
 class CustomPyramidFeatures(nn.Module):
     def __init__(self, C3_size, C4_size, C5_size, layers = [3,4,5,6,7], feature_size=256):
         super(CustomPyramidFeatures, self).__init__()
@@ -28,7 +118,7 @@ class CustomPyramidFeatures(nn.Module):
         # upsample C5 to get P5 from the FPN paper
         self.P5_1_1 = nn.Conv2d(C5_size, feature_size, kernel_size=1, stride=1, padding=0)
         self.P5_1_3 = nn.Conv2d(C5_size, feature_size, kernel_size=3, stride=1, padding=1)
-        self.P5_1_5 = nn.Conv2d(C5_size, feature_size, kernel_size=5, stride=1, padding=2)
+        self.P5_1_5 = nn.Conv2d(C5_size, feature_size, kernel_size=3, stride=1, padding=2, dilation=2)
         
         self.P5_upsampled = nn.Upsample(scale_factor=2, mode='nearest')
         self.P5_2 = nn.Conv2d(feature_size, feature_size, kernel_size=3, stride=1, padding=1)
@@ -36,7 +126,7 @@ class CustomPyramidFeatures(nn.Module):
         # add P5 elementwise to C4
         self.P4_1_1 = nn.Conv2d(C4_size, feature_size, kernel_size=1, stride=1, padding=0)
         self.P4_1_3 = nn.Conv2d(C4_size, feature_size, kernel_size=3, stride=1, padding=1)
-        self.P4_1_5 = nn.Conv2d(C4_size, feature_size, kernel_size=5, stride=1, padding=2)
+        self.P4_1_5 = nn.Conv2d(C4_size, feature_size, kernel_size=3, stride=1, padding=2, dilation=2)
         
         self.P4_upsampled = nn.Upsample(scale_factor=2, mode='nearest')
         self.P4_2 = nn.Conv2d(feature_size, feature_size, kernel_size=3, stride=1, padding=1)
@@ -44,7 +134,7 @@ class CustomPyramidFeatures(nn.Module):
         # add P4 elementwise to C3
         self.P3_1_1 = nn.Conv2d(C3_size, feature_size, kernel_size=1, stride=1, padding=0)
         self.P3_1_3 = nn.Conv2d(C3_size, feature_size, kernel_size=3, stride=1, padding=1)
-        self.P3_1_5 = nn.Conv2d(C3_size, feature_size, kernel_size=5, stride=1, padding=2)
+        self.P3_1_5 = nn.Conv2d(C3_size, feature_size, kernel_size=3, stride=1, padding=2, dilation=2)
         
         self.P3_2 = nn.Conv2d(feature_size, feature_size, kernel_size=3, stride=1, padding=1)
 
@@ -58,16 +148,16 @@ class CustomPyramidFeatures(nn.Module):
     def forward(self, inputs):
         C3, C4, C5 = inputs
 
-        P5_x = self.P5_1_1(C5) + self.P5_1_3(C5) + self.P5_1_5(C5)
+        P5_x = self.P5_1_1(C5) + self.P5_1_3(C5) + self.P5_1_5(C5) 
         P5_upsampled_x = self.P5_upsampled(P5_x)
         P5_x = self.P5_2(P5_x)
 
-        P4_x = self.P4_1_1(C4) + self.P4_1_3(C4) + self.P4_1_5(C4)
+        P4_x = self.P4_1_1(C4) + self.P4_1_3(C4) + self.P4_1_5(C4) 
         P4_x = P5_upsampled_x + P4_x
         P4_upsampled_x = self.P4_upsampled(P4_x)
         P4_x = self.P4_2(P4_x)
 
-        P3_x = self.P3_1_1(C3) + self.P3_1_3(C3) + self.P3_1_5(C3)
+        P3_x = self.P3_1_1(C3) + self.P3_1_3(C3) + self.P3_1_5(C3) 
         P3_x = P3_x + P4_upsampled_x
         P3_x = self.P3_2(P3_x)
 
@@ -230,24 +320,23 @@ class ResNet(nn.Module):
         self.layer3 = self._make_layer(block, 256, layers[2], stride=2)
         self.layer4 = self._make_layer(block, 512, layers[3], stride=2)
         
-        self.oan_layer1 = nn.Conv2d(in_channels=2048,  
-                                    out_channels=256,  
-                                    kernel_size=3,     
-                                    stride=2,          
-                                    padding=1) 
+        # self.oan_layer1 = nn.Conv2d(in_channels=2048,  
+        #                             out_channels=256,  
+        #                             kernel_size=3,     
+        #                             stride=2,          
+        #                             padding=1) 
         
-        self.oan_layer2 = nn.Conv2d(in_channels=256, 
-                                    out_channels=512,  
-                                    kernel_size=1,     
-                                    stride=1,          
-                                    padding=0) 
-        self.oan_layer3 = nn.Conv2d(in_channels=512,  
-                                    out_channels=1,  
-                                    kernel_size=1,     
-                                    stride=1,          
-                                    padding=0) 
+        # self.oan_layer2 = nn.Conv2d(in_channels=256, 
+        #                             out_channels=512,  
+        #                             kernel_size=1,     
+        #                             stride=1,          
+        #                             padding=0) 
+        # self.oan_layer3 = nn.Conv2d(in_channels=512,  
+        #                             out_channels=1,  
+        #                             kernel_size=1,     
+        #                             stride=1,          
+        #                             padding=0) 
         
-        self.oan_loss = losses.OANFocalLoss(alpha = oan_alpha, gamma = oan_gamma)
 
         if block == BasicBlock:
             fpn_sizes = [self.layer2[layers[1] - 1].conv2.out_channels, self.layer3[layers[2] - 1].conv2.out_channels,
@@ -261,6 +350,8 @@ class ResNet(nn.Module):
         # self.fpn = PyramidFeatures(fpn_sizes[0], fpn_sizes[1], fpn_sizes[2])
         
         self.fpn = CustomPyramidFeatures(fpn_sizes[0], fpn_sizes[1], fpn_sizes[2])
+        
+        # self.fpn = CustomPyramidFeaturesAT(fpn_sizes[0], fpn_sizes[1], fpn_sizes[2])
         
 
         self.regressionModel = RegressionModel(256)
@@ -333,9 +424,9 @@ class ResNet(nn.Module):
         x3 = self.layer3(x2)
         x4 = self.layer4(x3)
         
-        x_oan = self.oan_layer1(x4)
-        x_oan = self.oan_layer2(x_oan)
-        x_oan = self.oan_layer3(x_oan)
+        # x_oan = self.oan_layer1(x4)
+        # x_oan = self.oan_layer2(x_oan)
+        # x_oan = self.oan_layer3(x_oan)
         
         # if not self.training:
             
@@ -349,10 +440,9 @@ class ResNet(nn.Module):
         anchors = self.anchors(img_batch)
 
         if self.training:
-            class_loss, reg_loss = self.focalLoss(classification, regression, anchors, annotations)
-            # class_loss_ap, reg_loss_ap = self.aploss(classification, regression, anchors, annotations)
+            # class_loss, reg_loss = self.focalLoss(classification, regression, anchors, annotations)
+            class_loss, reg_loss = self.aploss(classification, regression, anchors, annotations)
             
-            # oan_loss = self.oan_loss(x_oan, annotations)
             return class_loss, reg_loss#, oan_loss, x_oan#, class_loss_ap, reg_loss_ap
         else:
             transformed_anchors = self.regressBoxes(anchors, regression)
