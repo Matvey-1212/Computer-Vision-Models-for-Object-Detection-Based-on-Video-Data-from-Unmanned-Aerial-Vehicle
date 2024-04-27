@@ -13,6 +13,7 @@ from torch.utils.data import DataLoader
 import torchvision.transforms as transforms
 import torchvision.transforms as T
 import torchvision.transforms.functional as F
+import torch.nn.functional as Ffunc
 import albumentations as A
 
 from nvidia.dali.pipeline import pipeline_def
@@ -22,7 +23,7 @@ from nvidia.dali.plugin.pytorch import DALIGenericIterator, LastBatchPolicy
 
 from utils.datasetLADD import LADD
 from utils.dataloader import collater_annot, ToTorch, Augmenter, Normalizer, Resizer
-from utils.Dali_resize import get_dali_pipeline, get_dali_pipeline_aug, flip_bboxes2, flip_bboxes, resize_bb
+from utils.Dali_resize import get_dali_pipeline, get_dali_pipeline_aug, get_dali_pipeline_no_resize, flip_bboxes2, flip_bboxes, resize_bb, up_bb
 from utils.metrics import evaluate
 from retinanet import model_oan
 from retinanet import losses
@@ -36,7 +37,7 @@ from retinanet.center_utils import make_hm_regr, pool, pred2box, pred2centers, g
 
 batch_size = 1
 num_workers = 2
-resize_to = (1312, 1312)
+resize_to = (1024, 1024)
 bb_pad = 0.5
 
 
@@ -53,10 +54,11 @@ bb_pad = 0.5
 # path_to_weights = '/home/maantonov_1/VKR/weights/retinanet/resize/test/main/1713683844/retinanet_resize_1713683844_h:1312_w:1312_main.pt'
 
 
-path_to_weights = '/home/maantonov_1/VKR/weights/retinanet/resize/main/2024-03-24/gamma2_alpha0.01/2024-03-24_retinanet_oan_resize_h:1024_w:1024_vis+small+main_lr:0.0003_step:10_gamma:2_alpha:0.01_n29_m:0.31_f:0.46_val:0.1128_last.pt'
-path_to_weights = '/home/maantonov_1/VKR/weights/retinanet/resize/test/main/1713810939/retinanet_resize_1713810939_h:1312_w:1312_main.pt'
+# path_to_weights = '/home/maantonov_1/VKR/weights/retinanet/resize/test/main/151/retinanet_resize_151_h:1024_w:1024.pt'
 
-path_to_weights = '/home/maantonov_1/VKR/weights/retinanet/resize/test/small/557/retinanet_resize_557_h:1024_w:1024_last.pt'
+# path_to_weights =  '/home/maantonov_1/VKR/weights/retinanet/resize/main/2024-03-24/gamma2_alpha0.01/2024-03-24_retinanet_oan_resize_h:1024_w:1024_vis+small+main_lr:0.0003_step:10_gamma:2_alpha:0.01_n29_m:0.31_f:0.46_val:0.1128_last.pt'
+
+path_to_weights = '/home/maantonov_1/VKR/weights/retinanet/resize/test/main/1713810939/retinanet_resize_1713810939_h:1312_w:1312_main.pt'
 
 
 # main_dir = '/home/maantonov_1/VKR/data/crope_data/main/crop_val_1024/'
@@ -77,7 +79,7 @@ annotations_file_val = main_dir + 'true_annotations/annot.json'
 
 
 dali_iterator_val = DALIGenericIterator(
-    pipelines=[get_dali_pipeline(images_dir = images_dir_val, annotations_file = annotations_file_val,resize_dims = resize_to, batch_size = batch_size, num_threads = num_workers)],
+    pipelines=[get_dali_pipeline_no_resize(images_dir = images_dir_val, annotations_file = annotations_file_val,resize_dims = resize_to, batch_size = batch_size, num_threads = num_workers)],
     output_map=['data', 'bboxe', 'bbox_shapes', 'img_id', 'original_sizes'],
     reader_name='Reader',
     last_batch_policy=LastBatchPolicy.PARTIAL,
@@ -112,28 +114,79 @@ active_list = []
 prediction = []
 time_running = []
 
+
 precision_list = []
 recall_list = [] 
 f1_list = []
+
+mean = [0.485, 0.456, 0.406]
+std = [0.229, 0.224, 0.225]
+normalize = transforms.Normalize(mean=mean, std=std)
 
 for iter_num, data in enumerate(dali_iterator_val):
             
     print(f'{iter_num} / {len(dali_iterator_val)}', end='')
     with torch.no_grad():
         
-        img = data[0]['data']
+        img = data[0]['data'] / 255
         bbox = data[0]['bboxe']
         img_id = data[0]['img_id']
         bb_shape = data[0]['bbox_shapes'].cpu()
-        original_sizes = data[0]['original_sizes']
-        bbox = resize_bb(bbox, original_sizes, bb_pad = bb_pad, new_shape = resize_to).int()
+        original_sizes = data[0]['original_sizes']    
+        
+        bbox = up_bb(bbox, original_sizes, bb_pad = bb_pad, shape = (img.shape[2],img.shape[3])).int()
         
         new_elements = torch.where(bbox[:, :, 3] == -1, -1, 1).unsqueeze(2)  
         annot = torch.cat((bbox, new_elements), dim=2).cpu()
         
-        t = time.time()
-        scores, labels, boxes = retinanet(img)
-        t1 = time.time()
+        
+        if img.shape[-1] > 6000:
+            image_t = Ffunc.interpolate(img,  
+                                        size=(resize_to[0], resize_to[1] * 2), 
+                                        mode='bilinear',  
+                                        align_corners=False)
+            image_t = normalize(image_t)
+            
+            
+            t = time.time()
+
+            scores, labels, boxes = retinanet(image_t[:, :, :, 0: resize_to[1]])
+            scores2, labels2, boxes2 = retinanet(image_t[:, :, :, resize_to[1]: resize_to[1] * 2])
+            t1 = time.time()
+            
+            if scores2.shape[0] != 0:
+                boxes2[:, 0] = boxes2[:, 0] + resize_to[1]
+                boxes2[:, 2] = boxes2[:, 2] + resize_to[1]
+            
+            scores = torch.cat((scores, scores2), dim=0)
+            labels = torch.cat((labels, labels2), dim=0)
+            boxes  = torch.cat((boxes, boxes2), dim=0)
+            
+            if scores.shape[0] != 0:
+                boxes[:,0] = boxes[:,0] / (resize_to[1] * 2) * img.shape[-1]
+                boxes[:,1] = boxes[:,1] / resize_to[0]       * img.shape[-2]
+                boxes[:,2] = boxes[:,2] / (resize_to[1] * 2) * img.shape[-1]
+                boxes[:,3] = boxes[:,3] / resize_to[0]       * img.shape[-2]
+            
+        else:
+            image_t = Ffunc.interpolate(img,  
+                                        size=(resize_to[0], resize_to[1]), 
+                                        mode='bilinear',  
+                                        align_corners=False)
+            image_t = normalize(image_t)
+            
+            t = time.time()
+            scores, labels, boxes = retinanet(image_t)
+            t1 = time.time()
+            
+            if scores.shape[0] != 0:
+                boxes[:,0] = boxes[:,0] / resize_to[1] * img.shape[-1]
+                boxes[:,1] = boxes[:,1] / resize_to[0] * img.shape[-2]
+                boxes[:,2] = boxes[:,2] / resize_to[1] * img.shape[-1]
+                boxes[:,3] = boxes[:,3] / resize_to[0] * img.shape[-2]
+            
+    
+    
         
     time_running.append(t1-t)
     print(f'\n    time: {t1-t}')
@@ -161,6 +214,7 @@ for iter_num, data in enumerate(dali_iterator_val):
     gt_dict['labels'] = gt_labels
     
     
+    
     if active_annot_tensor.shape[0] != 0:
         x = (active_annot_tensor[:,2] + active_annot_tensor[:,0])//2
         y = (active_annot_tensor[:,3] + active_annot_tensor[:,1])//2
@@ -184,6 +238,8 @@ for iter_num, data in enumerate(dali_iterator_val):
     f1_list.append(f1)
 
     map_score, Fscore = evaluate([(gt_dict, pred_dict)], score_threshold = 0.05)
+    
+    
 
     if len(scores) == 0:
          active_list.append([float(img_id), -1, -1, -1, -1, -1, map_score, Fscore])
@@ -194,7 +250,7 @@ for iter_num, data in enumerate(dali_iterator_val):
 
     prediction.append((gt_dict, pred_dict))
     
-pd.DataFrame(active_list, columns = ['id','sccore','xmin','ymin','xmax','ymax','map','fscore']).to_csv('/home/maantonov_1/VKR/actual_scripts/retinanet_sep/AL/AL_on_test_1024.csv')
+pd.DataFrame(active_list, columns = ['id','sccore','xmin','ymin','xmax','ymax','map','fscore']).to_csv('/home/maantonov_1/VKR/actual_scripts/retinanet_sep/AL/AL_on_test_1024_super.csv')
     
 
 print(f'{datetime.date.today().isoformat()}')
@@ -209,9 +265,7 @@ map_score, Fscore = evaluate(prediction, score_threshold = score_threshold, iou_
 print(f'score_threshold: {score_threshold}')
 print(f'map_score: {map_score}')
 print(f'Fscore: {Fscore}')
-
 print('__________________')
-
 print(f'precision {np.mean(precision_list)}')
 print(f'recall {np.mean(recall_list)}')
 print(f'f1 {np.mean(f1_list)}')

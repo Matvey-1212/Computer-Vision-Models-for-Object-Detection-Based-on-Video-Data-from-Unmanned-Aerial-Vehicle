@@ -5,7 +5,7 @@ import torch.utils.model_zoo as model_zoo
 import torchvision.models as models
 from torchvision.ops import nms
 from retinanet.utils import BasicBlock, Bottleneck, BBoxTransform, ClipBoxes
-from retinanet.anchors import Anchors
+from retinanet.anchors import Anchors, AnchorsP2
 from retinanet import losses
 from retinanet import OAN
 import torch.nn.functional as F
@@ -745,10 +745,10 @@ class ResNet(nn.Module):
         
         # self.fpn = CustomPyramidFeaturesATR2(fpn_sizes[0], fpn_sizes[1], fpn_sizes[2])
         
-        self.fpn = fpn(fpn_sizes[0], fpn_sizes[1], fpn_sizes[2])
+        self.fpn = fpn(fpn_sizes[0]//2, fpn_sizes[0], fpn_sizes[1], fpn_sizes[2])
         
-        self.anchors = Anchors()
-        # self.get_anchor = True
+        self.anchors = AnchorsP2(pyramid_levels = [2, 3, 4, 5])
+        self.get_anchor = True
         
         
         
@@ -830,7 +830,7 @@ class ResNet(nn.Module):
         # if not self.training:
             
 
-        features = self.fpn([x2, x3, x4])
+        features = self.fpn([x1, x2, x3, x4])
 
         regression = torch.cat([self.regressionModel(feature) for feature in features], dim=1)
 

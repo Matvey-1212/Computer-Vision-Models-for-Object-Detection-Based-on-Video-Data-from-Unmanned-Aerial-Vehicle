@@ -163,21 +163,21 @@ def get_dali_pipeline(images_dir, annotations_file):
     
 
 
-    images = fn.crop_mirror_normalize(images,
-                                      mean=mean,
-                                      std=std, device='gpu')
+    images = fn.crop_mirror_normalize(images, device='gpu')
+                                    #   mean=mean,
+                                    #   std=std, device='gpu')
     
     return images, bboxes, bbox_shapes, img_id
 
     
 # # main_dir = '/home/maantonov_1/VKR/data/crope_data/small/small_crop_val/'
-# main_dir = '/home/maantonov_1/VKR/data/crope_data/main/crop_train_1024/'
+# main_dir = '/home/maantonov_1/VKR/data/main_data/train/'
 # images_dir = main_dir + 'images'
-# annotations_file = main_dir + 'annotations/annot.json'
+# annotations_file = main_dir + 'true_train_annot/annot.json'
 
 
 # dali_iterator = DALIGenericIterator(
-#     pipelines=[get_dali_pipeline_aug(images_dir = images_dir, annotations_file = annotations_file, batch_size = 16, num_threads = 4)],
+#     pipelines=[get_dali_pipeline_aug(images_dir = images_dir, annotations_file = annotations_file, batch_size = 1, num_threads = 4)],
 #     output_map=['data', 'bboxe', 'bbox_shapes', 'img_id', 'horizontal_flip','vertical_flip'],
 #     reader_name='Reader',
 #     last_batch_policy=LastBatchPolicy.PARTIAL,
@@ -186,7 +186,7 @@ def get_dali_pipeline(images_dir, annotations_file):
 # )
 
 # dali_iterator_val = DALIGenericIterator(
-#     pipelines=[get_dali_pipeline(images_dir = images_dir, annotations_file = annotations_file, batch_size = 16, num_threads = 2)],
+#     pipelines=[get_dali_pipeline(images_dir = images_dir, annotations_file = annotations_file, batch_size = 1, num_threads = 2)],
 #     output_map=['data', 'bboxe', 'bbox_shapes', 'img_id'],
 #     reader_name='Reader',
 #     last_batch_policy=LastBatchPolicy.PARTIAL,
@@ -202,7 +202,7 @@ def get_dali_pipeline(images_dir, annotations_file):
 # n_pixels = 0
 
 # print('!')
-# for i, data in enumerate(dali_iterator):
+# for i, data in enumerate(dali_iterator_val):
     
 #     x = data[0]['data'].float()/255
 #     bbox = data[0]['bboxe'].int()
@@ -217,7 +217,7 @@ def get_dali_pipeline(images_dir, annotations_file):
 #     squared_sums += (x ** 2).sum(dim=[0, 2, 3])
 
 #     n_pixels += x.size(0) * x.size(2) * x.size(3)
-#     exit()
+#     # exit()
 
 
 # means = sums / n_pixels

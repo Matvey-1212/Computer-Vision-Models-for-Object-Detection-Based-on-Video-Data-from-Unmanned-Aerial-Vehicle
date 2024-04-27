@@ -24,7 +24,7 @@ from nvidia.dali.plugin.pytorch import DALIGenericIterator, LastBatchPolicy
 
 from utils.datasetLADD import LADD
 from utils.dataloader import collater_annot, ToTorch, Augmenter, Normalizer, Resizer
-from utils.Dali_resize import get_dali_pipeline, get_dali_pipeline_aug, flip_bboxes2, flip_bboxes, resize_bb
+from utils.Dali_resize import get_dali_pipeline, get_dali_pipeline_aug, flip_bboxes2, flip_bboxes, resize_bb, rotate_bboxes
 from utils.metrics import evaluate
 from retinanet import model_oan, model_incpetion
 from retinanet import losses
@@ -34,21 +34,21 @@ from retinanet import aploss
 # import torch.autograd
 # torch.autograd.set_detect_anomaly(True)
 
-test_id = '11'
+test_id = str(int(time.time()))
 
 
-epochs = 15
-batch_size = 8
+epochs = 100
+batch_size = 6
 num_workers = 2
 oan_gamma = 2
-oan_alpha = 0.25
+oan_alpha = 0.05
 resize_to = (1312, 1312)
 bb_pad = 0.5
-model_name = f'retinanet_oan_resize_h:{resize_to[0]}_w:{resize_to[1]}'
+model_name = f'retinanet_resize_{test_id}_h:{resize_to[0]}_w:{resize_to[1]}'
 
 #optimazer
 start_lr   = 0.0001
-num_steps  = 5
+num_steps  = 10
 gamma_coef = 0.5
 
 
@@ -64,9 +64,9 @@ print(f'resize_to {resize_to}')
 
 print(f'id {test_id}')
 
-weights_name = f'{datetime.date.today().isoformat()}_{model_name}_vis+small+main_lr:{start_lr}_step:{num_steps}_gamma:{oan_gamma}_alpha:{oan_alpha}'
+weights_name = f'{model_name}_main'
 # weights_name = f'{datetime.date.today().isoformat()}_retinanet_oan_vis+small_lr_lr{start_lr}_step{num_steps}_gamma{oan_gamma}_alpha{oan_alpha}'
-path_to_save = f'/home/maantonov_1/VKR/weights/retinanet/resize/test/main{bb_pad}/{datetime.date.today().isoformat()}/gamma{oan_gamma}_alpha{oan_alpha}/'
+path_to_save = f'/home/maantonov_1/VKR/weights/retinanet/resize/test/main/{test_id}/'
 if not os.path.exists(path_to_save):
     os.makedirs(path_to_save)
 path_to_save = path_to_save + weights_name
@@ -75,7 +75,7 @@ print(f'path_to_save {path_to_save}')
 
 
 # path_to_weights = '/home/maantonov_1/VKR/weights/retinanet/visdrone/retinanet_oan_vis_lr0.0003_step_5_gamma:2_alpha:0.25_n26_m:0.03_f:0.04.pt'
-path_to_weights = '/home/maantonov_1/VKR/weights/retinanet/resize/small/2024-03-23/gamma2_alpha0.1/2024-03-23_retinanet_oan_resize_h:1024_w:1024_vis+small_lr:0.0003_step:10_gamma:2_alpha:0.1_n28_m:0.45_f:0.24_val:0.5285.pt'
+path_to_weights = '/home/maantonov_1/VKR/weights/retinanet/resize/test/small/1713617111/retinanet_resize_h:1312_w:1312_main_last.pt'
 
 os.environ["WANDB_MODE"]="offline" 
 wandb.init(project="VKR", entity="matvey_antonov", name = f"{weights_name}")
@@ -87,7 +87,8 @@ main_dir = '/home/maantonov_1/VKR/data/main_data/train/'
 # main_dir = '/home/maantonov_1/VKR/data/small_train/train/'
 images_dir_tarin = main_dir + 'images'
 # annotations_file_train = main_dir + 'train_annot/annot.json'
-annotations_file_train = main_dir + 'more_sum_train_annot/annot.json'
+# annotations_file_train = main_dir + 'more_sum_train_annot/annot.json'
+annotations_file_train = main_dir + 'true_train_annot/annot.json'
 
 # main_dir = '/home/maantonov_1/VKR/data/crope_data/main/crop_val_1024/'
 # main_dir = '/home/maantonov_1/VKR/data/crope_data/small/small_crop_val/'
@@ -98,12 +99,12 @@ annotations_file_val = main_dir + 'val_annot/annot.json'
 
 main_dir = '/home/maantonov_1/VKR/data/main_data/test/'
 images_dir_test = main_dir + 'images'
-annotations_file_test = main_dir + 'annotations/annot.json'
+annotations_file_test = main_dir + 'true_annotations/annot.json'
 
 
 dali_iterator_train = DALIGenericIterator(
     pipelines=[get_dali_pipeline_aug(images_dir = images_dir_tarin, annotations_file = annotations_file_train, resize_dims = resize_to, batch_size = batch_size, num_threads = num_workers)],
-    output_map=['data', 'bboxe', 'bbox_shapes', 'img_id', 'horizontal_flip','vertical_flip', 'original_sizes'],
+    output_map=['data', 'bboxe', 'bbox_shapes', 'img_id', 'horizontal_flip','vertical_flip', 'original_sizes'],#, 'angles'],
     reader_name='Reader',
     last_batch_policy=LastBatchPolicy.PARTIAL,
     auto_reset=True,
@@ -139,6 +140,10 @@ print('CUDA available: {}'.format(torch.cuda.is_available()), flush=True)
 print(f'Crreating retinanet ===>', flush=True)
 
 retinanet = model_incpetion.resnet50(num_classes = 2, pretrained = False, inputs = 3)
+# 
+# retinanet = model_incpetion.resnetCustom(num_classes = 2, layers = [3, 10, 6, 3], inputs = 3)
+
+
 
 
 # retinanet = torch.load(path_to_weights, map_location=device)
@@ -177,9 +182,11 @@ def train_one_epoch(epoch_num, train_data_loader):
         v_flip = data[0]['vertical_flip']
         bb_shape = data[0]['bbox_shapes']
         original_sizes = data[0]['original_sizes']
+        # angles = data[0]['angles']
         
         bbox = resize_bb(bbox, original_sizes, bb_pad = bb_pad, new_shape = resize_to)
-        bbox = flip_bboxes(bbox, h_flip, v_flip, bb_shape,img_size=resize_to)
+        bbox = flip_bboxes(bbox, h_flip, v_flip, bb_shape, img_size=resize_to)
+        # bbox = rotate_bboxes(bbox, angles, bb_shape, img_size=resize_to)
         
         new_elements = torch.where(bbox[:, :, 3] == -1, -1, 1).unsqueeze(2)  
         annot = torch.cat((bbox, new_elements), dim=2).to(device)
@@ -187,8 +194,8 @@ def train_one_epoch(epoch_num, train_data_loader):
         
         classification_loss, regression_loss = retinanet([img, annot])
                 
-        classification_loss = classification_loss.mean()
-        regression_loss = regression_loss.mean()
+        # classification_loss = classification_loss.mean()
+        # regression_loss = regression_loss.mean()
         # class_loss_ap = class_loss_ap.mean()
         # reg_loss_ap = reg_loss_ap.mean()
 
@@ -204,9 +211,9 @@ def train_one_epoch(epoch_num, train_data_loader):
                 
         loss.backward()
 
-        torch.nn.utils.clip_grad_norm_(retinanet.parameters(), max_norm=2.0)
+        torch.nn.utils.clip_grad_norm_(retinanet.parameters(), max_norm=0.5)
         
-        torch.nn.utils.clip_grad_value_(retinanet.parameters(), clip_value=0.5)
+        torch.nn.utils.clip_grad_value_(retinanet.parameters(), clip_value=0.1)
                 
         optimizer.step()
         epoch_loss.append(float(loss))
@@ -219,6 +226,8 @@ def train_one_epoch(epoch_num, train_data_loader):
         del classification_loss
         del regression_loss
         del oan_loss
+        
+       
         
         
     # Update the learning rate
@@ -253,8 +262,8 @@ def valid_one_epoch(epoch_num, valid_data_loader):
             
             classification_loss, regression_loss = retinanet([img, annot])
                 
-            classification_loss = classification_loss.mean()
-            regression_loss = regression_loss.mean()
+            # classification_loss = classification_loss.mean()
+            # regression_loss = regression_loss.mean()
             # class_loss_ap = class_loss_ap.mean()
             # reg_loss_ap = reg_loss_ap.mean()
 
@@ -345,6 +354,16 @@ def get_metric_one_epoch(epoch_num, valid_data_loader, best_val, last_val, mode 
         print(f'path_to_save {path_to_save}')
         print(f'AVG time: {np.mean(time_running)}')
         print()
+        
+        iou_thr_max = 0.6
+        print(f'iou_thr_max: {iou_thr_max}')
+        
+        score_threshold = 0.05
+        map_score, Fscore = evaluate(prediction, score_threshold = score_threshold, iou_thr_max=iou_thr_max)
+        print(f'score_threshold: {score_threshold}')
+        print(f'map_score: {map_score}')
+        print(f'Fscore: {Fscore}')
+        print('________________')
 
         for i_tresh in [0.01, 0.05, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7]:
             score_threshold = i_tresh
@@ -367,11 +386,11 @@ def get_metric_one_epoch(epoch_num, valid_data_loader, best_val, last_val, mode 
     et = time.time()
     print("\n Total Time - {}\n".format(int(et - st)))
     
-    # if best_val > last_val:
-    #     best_val = last_val
-    #     torch.save(retinanet, f"{path_to_save}_n{epoch_num}_m:{map_score:0.2f}_f:{Fscore:0.2f}_val:{best_val:0.4f}.pt")
-    # elif epoch_num >= epochs - 1:
-    #     torch.save(retinanet, f"{path_to_save}_n{epoch_num}_m:{map_score:0.2f}_f:{Fscore:0.2f}_val:{last_val:0.4f}_last.pt")
+    if best_val > last_val:
+        best_val = last_val
+        torch.save(retinanet, f"{path_to_save}.pt")
+    if epoch_num >= epochs - 1:
+        torch.save(retinanet, f"{path_to_save}_last.pt")
         
     return map_score, Fscore, best_val
     

@@ -156,7 +156,7 @@ class CopyPasteAugmentation:
                 
                 l_height, l_width = local_image.shape[1:]
                 
-                random_scale = np.random.uniform(0.5, 1.5, 1)
+                random_scale = np.random.uniform(0.2, 1.2, 1)
                 
                 box = local_annot[0]
                 _,_,_, w, h = box
@@ -164,8 +164,8 @@ class CopyPasteAugmentation:
                 w, h = float(w) * l_width, float(h) * l_height
                 
                 
-                new_scaled_w = min(25, max(w * random_scale, 7))/w
-                new_scaled_h = min(40, max(h * random_scale, 10))/h
+                new_scaled_w = min(40, max(w * random_scale, 7))/w
+                new_scaled_h = min(60, max(h * random_scale, 15))/h
                 
                 local_image = F.interpolate(local_image.unsqueeze(0),  
                                           size=(int(l_height * new_scaled_h), int(l_width * new_scaled_w)), 
@@ -176,6 +176,24 @@ class CopyPasteAugmentation:
                 
                 new_x = np.random.randint(0, bg_shape[1]-l_width, 1)[0]
                 new_y = np.random.randint(0, bg_shape[0]-l_height, 1)[0]
+                
+                flag_0 = False
+                for d, val in enumerate(gt_annots[i]):
+                    if val[-1] != -1:
+                        x_t1 = gt_annots[i][d][0]
+                        y_t1 = gt_annots[i][d][1]
+                        x_t2 = gt_annots[i][d][2]
+                        y_t2 = gt_annots[i][d][3]
+                        
+                        x_c = int((x_t2 + x_t1)/2)
+                        y_c = int((y_t2 + y_t1)/2)
+                        
+                        if new_x - 10 <= x_c <= new_x + l_width + 10:
+                            flag_0 = True
+                        if new_y - 10 <= y_c <= new_y + l_height + 10:
+                            flag_0 = True
+                if flag_0:
+                    continue
                         
                 box = local_annot[0]
                 
@@ -195,17 +213,19 @@ class CopyPasteAugmentation:
                 if np.random.rand() < 0.5:
                     local_image = local_image.flip(dims=[-2])#[:, :, ::-1]
 
-                radius = np.sqrt((x1 - x2) ** 2 + (y1 - y2) ** 2) * 0.5
+                # radius = np.sqrt((x1 - x2) ** 2 + (y1 - y2) ** 2) * 0.5
                 
-                x_closed_distorted, y_closed_distorted = self.closed_distorted_circle(radius, num_points= self.num_points)
-                mask = self.create_feathered_mask_from_curve(x_closed_distorted + l_width // 2, y_closed_distorted + l_height // 2, l_height, l_width, feather_amount=self.feather_amount).to(self.device)
+                # x_closed_distorted, y_closed_distorted = self.closed_distorted_circle(radius, num_points= self.num_points)
+                # mask = self.create_feathered_mask_from_curve(x_closed_distorted + l_width // 2, y_closed_distorted + l_height // 2, l_height, l_width, feather_amount=self.feather_amount).to(self.device)
 #                 mask = self.create_feathered_mask(l_width, l_height, 0.5).to(self.device)
 #                 mask = torch.ones((l_height, l_width)) 
     
-                background_images[i] = self.alpha_composite(local_image, background_images[i], mask/255, position=(new_x, new_y))
+                # background_images[i] = self.alpha_composite(local_image, background_images[i], mask/255, position=(new_x, new_y))
         
 #                 if self.transform is not None:
 #                     background_images[i] = torch.tensor(self.transform(image=background_images[i].permute(1,2,0).numpy())['image']).permute(2,0,1)
+
+                background_images[i,:,new_y:l_height+new_y,new_x:l_width+new_x] = local_image
     
                 for d, val in enumerate(gt_annots[i]):
                     if val[-1] == -1:

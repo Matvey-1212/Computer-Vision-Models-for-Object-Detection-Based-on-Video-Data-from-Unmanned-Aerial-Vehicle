@@ -3,6 +3,42 @@ import torch
 import torch.nn as nn
 
 
+class AnchorsP2(nn.Module):
+    def __init__(self, pyramid_levels=[3, 4, 5, 6, 7], strides=None, sizes=None, ratios=None, scales=None):
+        super(AnchorsP2, self).__init__()
+
+        
+        self.pyramid_levels = pyramid_levels 
+        if strides is None:
+            self.strides = [2 ** x for x in self.pyramid_levels]
+        if sizes is None:
+            self.sizes = [2 ** (x + 2) for x in self.pyramid_levels]
+        if ratios is None:
+            self.ratios = np.array([0.5, 1, 2])
+        if scales is None:
+            self.scales = np.array([2 ** 0, 2 ** (1.0 / 3.0), 2 ** (2.0 / 3.0)])
+
+    def forward(self, image):
+        
+        image_shape = image.shape[2:]
+        image_shape = np.array(image_shape)
+        image_shapes = [(image_shape + 2 ** x - 1) // (2 ** x) for x in self.pyramid_levels]
+
+        # compute anchors over all pyramid levels
+        all_anchors = np.zeros((0, 4)).astype(np.float32)
+
+        for idx, p in enumerate(self.pyramid_levels):
+            anchors         = generate_anchors(base_size=self.sizes[idx], ratios=self.ratios, scales=self.scales)
+            shifted_anchors = shift(image_shapes[idx], self.strides[idx], anchors)
+            all_anchors     = np.append(all_anchors, shifted_anchors, axis=0)
+
+        all_anchors = np.expand_dims(all_anchors, axis=0)
+
+        if torch.cuda.is_available():
+            return torch.from_numpy(all_anchors.astype(np.float32)).cuda()
+        else:
+            return torch.from_numpy(all_anchors.astype(np.float32))
+
 class Anchors(nn.Module):
     def __init__(self, pyramid_levels=None, strides=None, sizes=None, ratios=None, scales=None):
         super(Anchors, self).__init__()

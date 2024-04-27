@@ -5,8 +5,9 @@
 #SBATCH --time=40:00:00              # Максимальное время выполнения
 #SBATCH --ntasks=1                   # Количество MPI процессов
 #SBATCH --nodes=1                    # Требуемое кол-во узлов
-#SBATCH --cpus-per-task=2       # Количество ядер CPU, выделенных для одного процесса
+#SBATCH --cpus-per-task=1       # Количество ядер CPU, выделенных для одного процесса
 #SBATCH --gpus 1                     # Требуемое кол-во GPU
+# --constraint="type_e"
 #SBATCH -A proj_1513
 
 module purge
@@ -14,4 +15,4 @@ module load Python
 source deactivate
 source activate retinanet
 
-python -u train_retina_oan_resize_dali_copypast.py
+python -u train_retina_oan_resize_dali_copypast.py 
