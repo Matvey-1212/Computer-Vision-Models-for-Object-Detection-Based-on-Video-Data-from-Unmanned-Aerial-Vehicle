@@ -14,4 +14,4 @@ module load Python
 source deactivate
 source activate retinanet
 
-python -u Dali_resize.py
+python -u Dali_resize_copy.py

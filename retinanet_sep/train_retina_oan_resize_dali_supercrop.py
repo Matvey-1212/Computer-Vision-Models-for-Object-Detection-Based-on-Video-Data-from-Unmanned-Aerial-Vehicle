@@ -19,6 +19,7 @@ import torchvision.transforms as transforms
 import torchvision.transforms as T
 import torchvision.transforms.functional as F
 import albumentations as A
+import torch.utils.model_zoo as model_zoo
 
 from nvidia.dali.pipeline import pipeline_def
 import nvidia.dali.types as types
@@ -27,13 +28,15 @@ from nvidia.dali.plugin.pytorch import DALIGenericIterator, LastBatchPolicy
 
 from utils.datasetLADD import LADD
 from utils.dataloader import collater_annot, ToTorch, Augmenter, Normalizer, Resizer
-from utils.Dali_resize import get_dali_pipeline, get_dali_pipeline_aug, flip_bboxes2, flip_bboxes, resize_bb, rotate_bboxes
+from utils.Dali_resize import get_dali_pipeline, get_dali_pipeline_aug, flip_bboxes2, flip_bboxes, resize_bb, rotate_bboxes,rotate_bboxes2, get_dali_pipeline_aug_rotate
 from utils.metrics import evaluate
-from retinanet import model_oan, model_incpetion, model_incpetion_new_fpn
+from retinanet import model_incpetion, model_incpetion_new_fpn
 from retinanet import losses
 from retinanet import aploss
 from retinanet.model_incpetion import PyramidFeatures, CustomPyramidFeatures, CustomPyramidFeaturesAT, CustomPyramidFeaturesAT2, CustomPyramidFeaturesR2, CustomPyramidFeaturesATR2, CustomPyramidFeaturesAT2_newLayer, CustomPyramidFeaturesAT2_newLayer_P2
+from retinanet.model_incpetion_new_fpn import PyramidFeaturesP2, CustomPyramidFeaturesAT2_small_newLayer_P2, CustomPyramidFeaturesAT2_small2_newLayer_P2, CustomPyramidFeaturesAT_newlayer
 from retinanet.center_utils import make_hm_regr, pool, pred2box, pred2centers, get_true_centers, calculate_accuracy_metrics
+from retinanet.anchors import Anchors, AnchorsP2, simpleAnchors
 
 def load_config(config_path):
     with open(config_path, "r") as file:
@@ -93,7 +96,7 @@ print(f'path_to_save {path_to_save}')
 
 
 # path_to_weights = '/home/maantonov_1/VKR/weights/retinanet/visdrone/retinanet_oan_vis_lr0.0003_step_5_gamma:2_alpha:0.25_n26_m:0.03_f:0.04.pt'
-path_to_weights = '/home/maantonov_1/VKR/weights/retinanet/resize/test/main/1713810939/retinanet_resize_1713810939_h:1312_w:1312_main.pt'
+# path_to_weights = '/home/maantonov_1/VKR/weights/retinanet/resize/test/main/1713810939/retinanet_resize_1713810939_h:1312_w:1312_main.pt'
 
 os.environ["WANDB_MODE"]="offline" 
 wandb.init(project="VKR", entity="matvey_antonov", name = f"{weights_name}")
@@ -123,7 +126,7 @@ annotations_file_train = main_dir + annot_path
 # main_dir = '/home/maantonov_1/VKR/data/small_train/train/'
 # main_dir = '/home/maantonov_1/VKR/data/main_data/super_crop_1312/'
 
-main_dir = config['data']['train_path']
+main_dir = config['data']['valid_path']
 images_dir_val = main_dir + 'images'
 # annotations_file_val = main_dir + 'val_annot/annot.json'
 annot_path = config['data']['valid_annot_path']
@@ -133,24 +136,67 @@ main_dir = '/home/maantonov_1/VKR/data/main_data/test/'
 images_dir_test = main_dir + 'images'
 annotations_file_test = main_dir + 'true_annotations/annot.json'
 
+double_dataset_flag = config['data']['double_dataset']
 
-dali_iterator_train = DALIGenericIterator(
-    pipelines=[get_dali_pipeline_aug(images_dir = images_dir_tarin, annotations_file = annotations_file_train, resize_dims = resize_to, batch_size = batch_size, num_threads = num_workers)],
-    output_map=['data', 'bboxe', 'bbox_shapes', 'img_id', 'horizontal_flip','vertical_flip', 'original_sizes'],#, 'angles'],
-    reader_name='Reader',
-    last_batch_policy=LastBatchPolicy.PARTIAL,
-    auto_reset=True,
-    dynamic_shape=True
-)
+aug_rotate = config['training']['rotate']
+if aug_rotate:
+    print('use rotate')
+    dali_iterator_train = DALIGenericIterator(
+        pipelines=[get_dali_pipeline_aug_rotate(images_dir = images_dir_tarin, annotations_file = annotations_file_train, resize_dims = resize_to, batch_size = batch_size, num_threads = num_workers)],
+        output_map=['data', 'bboxe', 'bbox_shapes', 'img_id', 'horizontal_flip','vertical_flip', 'original_sizes', 'angles'],
+        reader_name='Reader',
+        last_batch_policy=LastBatchPolicy.PARTIAL,
+        auto_reset=True,
+        # dynamic_shape=True
+    )
+else:
+    dali_iterator_train = DALIGenericIterator(
+        pipelines=[get_dali_pipeline_aug(images_dir = images_dir_tarin, annotations_file = annotations_file_train, resize_dims = resize_to, batch_size = batch_size, num_threads = num_workers)],
+        output_map=['data', 'bboxe', 'bbox_shapes', 'img_id', 'horizontal_flip','vertical_flip', 'original_sizes'],#, 'angles'],
+        reader_name='Reader',
+        last_batch_policy=LastBatchPolicy.PARTIAL,
+        auto_reset=True,
+        # dynamic_shape=True
+    )
 
-dali_iterator_val = DALIGenericIterator(
-    pipelines=[get_dali_pipeline(images_dir = images_dir_val, annotations_file = annotations_file_val,resize_dims = resize_to, batch_size = batch_size, num_threads = num_workers)],
-    output_map=['data', 'bboxe', 'bbox_shapes', 'img_id', 'original_sizes'],
-    reader_name='Reader',
-    last_batch_policy=LastBatchPolicy.PARTIAL,
-    auto_reset=True,
-    dynamic_shape=True
-)
+train_iterator_pipe = [dali_iterator_train]
+
+if double_dataset_flag:
+    main_dir = config['data']['double_train_path']
+    images_dir_tarin = main_dir + 'images'
+
+    annot_path = config['data']['double_train_annot_path']
+    annotations_file_train = main_dir + annot_path
+
+    if aug_rotate:
+        print('use rotate')
+        dali_iterator_double_train = DALIGenericIterator(
+            pipelines=[get_dali_pipeline_aug_rotate(images_dir = images_dir_tarin, annotations_file = annotations_file_train, resize_dims = resize_to, batch_size = batch_size, num_threads = num_workers)],
+            output_map=['data', 'bboxe', 'bbox_shapes', 'img_id', 'horizontal_flip','vertical_flip', 'original_sizes', 'angles'],
+            reader_name='Reader',
+            last_batch_policy=LastBatchPolicy.PARTIAL,
+            auto_reset=True,
+            # dynamic_shape=True
+        )
+    else:
+        dali_iterator_double_train = DALIGenericIterator(
+            pipelines=[get_dali_pipeline_aug(images_dir = images_dir_tarin, annotations_file = annotations_file_train, resize_dims = resize_to, batch_size = batch_size, num_threads = num_workers)],
+            output_map=['data', 'bboxe', 'bbox_shapes', 'img_id', 'horizontal_flip','vertical_flip', 'original_sizes'],#, 'angles'],
+            reader_name='Reader',
+            last_batch_policy=LastBatchPolicy.PARTIAL,
+            auto_reset=True,
+            # dynamic_shape=True
+        )
+    train_iterator_pipe = [dali_iterator_train, dali_iterator_double_train]
+
+# dali_iterator_val = DALIGenericIterator(
+#     pipelines=[get_dali_pipeline(images_dir = images_dir_val, annotations_file = annotations_file_val,resize_dims = resize_to, batch_size = batch_size, num_threads = num_workers)],
+#     output_map=['data', 'bboxe', 'bbox_shapes', 'img_id', 'original_sizes'],
+#     reader_name='Reader',
+#     last_batch_policy=LastBatchPolicy.PARTIAL,
+#     auto_reset=True,
+#     # dynamic_shape=True
+# )
 
 dali_iterator_test = DALIGenericIterator(
     pipelines=[get_dali_pipeline(images_dir = images_dir_test, annotations_file = annotations_file_test, resize_dims = resize_to, batch_size = batch_size, num_threads = num_workers)],
@@ -158,7 +204,7 @@ dali_iterator_test = DALIGenericIterator(
     reader_name='Reader',
     last_batch_policy=LastBatchPolicy.PARTIAL,
     auto_reset=True,
-    dynamic_shape=True
+    # dynamic_shape=True
 )
 
 print(f'dataset Created', flush=True)
@@ -178,6 +224,7 @@ fpn_type = config['model']['fpn']
 if fpn_type == 'PyramidFeatures':
     fpn = PyramidFeatures
     retinanet = model_incpetion.resnet50(num_classes = 2, pretrained = False, inputs = 3, fpn = fpn)
+
 elif fpn_type == 'CustomPyramidFeatures':
     fpn = CustomPyramidFeatures
     retinanet = model_incpetion.resnet50(num_classes = 2, pretrained = False, inputs = 3, fpn = fpn)
@@ -199,13 +246,43 @@ elif fpn_type == 'CustomPyramidFeaturesAT2_newLayer':
 elif fpn_type == 'CustomPyramidFeaturesAT2_newLayer_P2':
     fpn = CustomPyramidFeaturesAT2_newLayer_P2
     retinanet = model_incpetion_new_fpn.resnet50(num_classes = 2, pretrained = False, inputs = 3, fpn = fpn)
+elif fpn_type == 'PyramidFeaturesP2':
+    fpn = PyramidFeaturesP2
+    retinanet = model_incpetion_new_fpn.resnet50(num_classes = 2, pretrained = False, inputs = 3, fpn = fpn)
+elif fpn_type == 'CustomPyramidFeaturesAT2_small_newLayer_P2':
+    fpn = CustomPyramidFeaturesAT2_small_newLayer_P2
+    retinanet = model_incpetion_new_fpn.resnet50(num_classes = 2, pretrained = False, inputs = 3, fpn = fpn)
+elif fpn_type == 'CustomPyramidFeaturesAT2_small2_newLayer_P2':
+    fpn = CustomPyramidFeaturesAT2_small2_newLayer_P2
+    retinanet = model_incpetion_new_fpn.resnet50(num_classes = 2, pretrained = False, inputs = 3, fpn = fpn)
+elif fpn_type == 'CustomPyramidFeaturesAT_newlayer':
+    fpn = CustomPyramidFeaturesAT_newlayer
+    retinanet = model_incpetion_new_fpn.resnet50(num_classes = 2, pretrained = False, inputs = 3, fpn = fpn)
+    
+
+    
+    
     
 print(f'FPN: {fpn_type}')
 
 
 
 # retinanet = model_incpetion.resnetCustom(num_classes = 2, layers = [3, 10, 6, 3], inputs = 3)
-# retinanet = torch.load(path_to_weights, map_location=device)
+
+if config['model']['pretrain']:
+    path_to_weights = config['model']['weigh_path'] 
+    retinanet = torch.load(path_to_weights, map_location=device)
+    print(f'Pretrain on {path_to_weights}')
+    
+    
+if config['model']['pretrain_on_ImageNet']:
+    weights = model_zoo.load_url('https://download.pytorch.org/models/resnet50-19c8e357.pth', model_dir='.')
+    # print(retinanet)
+    retinanet.load_state_dict(weights, strict=False)
+    # print(retinanet)
+    
+    print(f'pretrain_on_ImageNet')
+    # exit()
 
 
 criterion_type = config['training']['criterion']
@@ -224,8 +301,28 @@ print(criterion_type)
 # retinanet.aploss = aploss.APLoss.apply
 
 
-optimizer = optim.AdamW(retinanet.parameters(), lr = start_lr)
-lr_scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size = num_steps, gamma=gamma_coef)
+if config['model']['freeze_backbone']:
+    print('freeze_backbone ')
+    for name, param in retinanet.named_parameters():
+        if name.startswith('layer') or name.startswith('conv1') or name.startswith('bn1'):
+            # print(name)
+            param.requires_grad = False
+            
+    if config['model']['freeze_fpn']:
+        print('freeze_fpn ')
+        for name, param in retinanet.named_parameters():
+            if name.startswith('fpn'):
+                # print(name)
+                param.requires_grad = False
+        
+            
+    optimizer = optim.AdamW(filter(lambda p: p.requires_grad, retinanet.parameters()), lr = start_lr) 
+    
+else:
+    optimizer = optim.AdamW(retinanet.parameters(), lr = start_lr)
+    
+# lr_scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size = num_steps, gamma=gamma_coef)
+lr_scheduler = torch.optim.lr_scheduler.MultiStepLR(optimizer, milestones=[5, 15, 30,80], gamma=gamma_coef)
 # scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimizer, patience=7, verbose=True)
 
 retinanet.to(device)
@@ -240,8 +337,11 @@ def train_one_epoch(epoch_num, train_data_loader):
     retinanet.train()
     
     epoch_loss = []
+    
+    if double_dataset_flag:
+        double_train = enumerate(train_data_loader[1])
 
-    for iter_num, data in enumerate(train_data_loader):
+    for iter_num, data in enumerate(train_data_loader[0]):
                 
         optimizer.zero_grad()
         
@@ -254,11 +354,15 @@ def train_one_epoch(epoch_num, train_data_loader):
         v_flip = data[0]['vertical_flip']
         bb_shape = data[0]['bbox_shapes']
         original_sizes = data[0]['original_sizes']
-        # angles = data[0]['angles']
+        
+        if aug_rotate:
+            angles = data[0]['angles']
         
         bbox = resize_bb(bbox, original_sizes, bb_pad = bb_pad, new_shape = resize_to)
         bbox = flip_bboxes(bbox, h_flip, v_flip, bb_shape, img_size=resize_to)
-        # bbox = rotate_bboxes(bbox, angles, bb_shape, img_size=resize_to)
+        
+        if aug_rotate:
+            bbox = rotate_bboxes2(bbox, angles, bb_shape, img_size=resize_to)
         
         new_elements = torch.where(bbox[:, :, 3] == -1, -1, 1).unsqueeze(2)  
         annot = torch.cat((bbox, new_elements), dim=2).to(device)
@@ -285,9 +389,9 @@ def train_one_epoch(epoch_num, train_data_loader):
                 
         loss.backward()
 
-        torch.nn.utils.clip_grad_norm_(retinanet.parameters(), max_norm=0.5)
+        torch.nn.utils.clip_grad_norm_(retinanet.parameters(), max_norm=2.0)
         
-        torch.nn.utils.clip_grad_value_(retinanet.parameters(), clip_value=0.1)
+        torch.nn.utils.clip_grad_value_(retinanet.parameters(), clip_value=0.5)
                 
         optimizer.step()
         epoch_loss.append(float(loss))
@@ -300,6 +404,75 @@ def train_one_epoch(epoch_num, train_data_loader):
         del classification_loss
         del regression_loss
         del oan_loss
+        
+        
+        if double_dataset_flag and iter_num % 2 == 0:
+            optimizer.zero_grad()
+        
+            # img, annot = data['img'].cuda().float(), data['annot'].cuda().float()
+            try:
+                iter_num, data = next(double_train)
+            except:
+                double_train = enumerate(train_data_loader[1])
+                iter_num, data = next(double_train)
+            
+            img = data[0]['data']
+            bbox = data[0]['bboxe'].int()
+            z = data[0]['img_id']
+            h_flip = data[0]['horizontal_flip']
+            v_flip = data[0]['vertical_flip']
+            bb_shape = data[0]['bbox_shapes']
+            original_sizes = data[0]['original_sizes']
+            
+            if aug_rotate:
+                angles = data[0]['angles']
+            
+            bbox = resize_bb(bbox, original_sizes, bb_pad = bb_pad, new_shape = resize_to)
+            bbox = flip_bboxes(bbox, h_flip, v_flip, bb_shape, img_size=resize_to)
+            
+            if aug_rotate:
+                bbox = rotate_bboxes(bbox, angles, bb_shape, img_size=resize_to)
+            
+            new_elements = torch.where(bbox[:, :, 3] == -1, -1, 1).unsqueeze(2)  
+            annot = torch.cat((bbox, new_elements), dim=2).to(device)
+            
+            
+            # classification_loss, regression_loss = retinanet([img, annot])
+            
+            classification_loss, regression_loss = criterion(*retinanet([img, annot]))
+                    
+            classification_loss = classification_loss.mean()
+            regression_loss = regression_loss.mean()
+            # class_loss_ap = class_loss_ap.mean()
+            # reg_loss_ap = reg_loss_ap.mean()
+
+
+            loss = classification_loss + regression_loss #+ 4 * oan_loss #+ class_loss_ap #+ reg_loss_ap
+            oan_loss = 0
+
+            if bool(loss == 0):
+                # print(
+                # 'Epoch: {} | Iteration: {} | Classification loss: {:1.5f} | Regression loss: {:1.5f} | oan loss: {:1.5f} | Running loss: {:1.5f}'.format(
+                #     epoch_num, iter_num, float(classification_loss), float(regression_loss), float(oan_loss), np.mean(epoch_loss)), flush=True)
+                continue
+                    
+            loss.backward()
+
+            torch.nn.utils.clip_grad_norm_(retinanet.parameters(), max_norm=0.5)
+            
+            torch.nn.utils.clip_grad_value_(retinanet.parameters(), clip_value=0.1)
+                    
+            optimizer.step()
+            epoch_loss.append(float(loss))
+
+            if iter_num % 10 == 0:
+                print(
+                    'Epoch: {} | Iteration: {} | Classification loss: {:1.5f} | Regression loss: {:1.5f} | oan loss: {:1.5f} | Running loss: {:1.5f}'.format(
+                        epoch_num, iter_num, float(classification_loss), float(regression_loss), float(oan_loss), np.mean(epoch_loss)), flush=True)
+            
+            del classification_loss
+            del regression_loss
+            del oan_loss
         # break
        
         
@@ -334,7 +507,9 @@ def valid_one_epoch(epoch_num, valid_data_loader):
             new_elements = torch.where(bbox[:, :, 3] == -1, -1, 1).unsqueeze(2)  
             annot = torch.cat((bbox, new_elements), dim=2).to(device)
             
-            classification_loss, regression_loss = criterion(*retinanet([img, annot]))
+            classification_t, regression_t, anchors_t, annotations_t = retinanet([img, annot])
+            
+            classification_loss, regression_loss = criterion(classification_t, regression_t, anchors_t, annotations_t)
                 
             classification_loss = classification_loss.mean()
             regression_loss = regression_loss.mean()
@@ -366,7 +541,7 @@ def valid_one_epoch(epoch_num, valid_data_loader):
     
     return np.mean(epoch_loss)
     
-def get_metric_one_epoch(epoch_num, valid_data_loader, best_val, last_val, metrics, mode = 'val'):
+def get_metric_one_epoch(epoch_num, valid_data_loader, best_val, metrics, mode = 'val'):
     
     torch.cuda.empty_cache()
     
@@ -397,10 +572,30 @@ def get_metric_one_epoch(epoch_num, valid_data_loader, best_val, last_val, metri
             annot = torch.cat((bbox, new_elements), dim=2).cpu()
             
             t = time.time()
-            scores, labels, boxes = retinanet(img)
+            scores, labels, boxes, classification_t, regression_t, anchors_t = retinanet(img)
             t1 = time.time()
+            annotations_t = annot.to(device)
             
-            pred_dict = {}
+            classification_loss, regression_loss = criterion(classification_t, regression_t, anchors_t, annotations_t)
+                
+            classification_loss = classification_loss.mean()
+            regression_loss = regression_loss.mean()
+            
+            loss = classification_loss + regression_loss #+ 4 * oan_loss #+ class_loss_ap #+ reg_loss_ap
+            oan_loss = 0
+
+            epoch_loss.append(float(loss))
+
+            if iter_num % 10 == 0:
+                print(
+                    'Epoch: {} | Iteration: {} | Classification loss: {:1.5f} | Regression loss: {:1.5f} | oan loss: {:1.5f}  | Running loss: {:1.5f}'.format(
+                        epoch_num, iter_num, float(classification_loss), float(regression_loss), float(oan_loss), np.mean(epoch_loss)), flush=True)
+        
+        del classification_loss
+        del regression_loss
+        del oan_loss
+            
+        pred_dict = {}
             
         time_running.append(t1-t)
         scores = scores.cpu().numpy()
@@ -454,6 +649,16 @@ def get_metric_one_epoch(epoch_num, valid_data_loader, best_val, last_val, metri
     print(f'f1 {np.mean(f1_list)}')
 
     print('__________________')
+    
+    iou_thr_max = 0.6
+    print(f'iou_thr_max: {iou_thr_max}')
+    
+    score_threshold = 0.05
+    map_score, Fscore = evaluate(prediction, score_threshold = score_threshold, iou_thr_max=iou_thr_max)
+    print(f'score_threshold: {score_threshold}')
+    print(f'map_score: {map_score}')
+    print(f'Fscore: {Fscore}')
+    print('________________')
         
     if mode == 'test':
         print(f'{datetime.date.today().isoformat()}')
@@ -461,17 +666,8 @@ def get_metric_one_epoch(epoch_num, valid_data_loader, best_val, last_val, metri
         print(f'AVG time: {np.mean(time_running)}')
         print()
         
-        iou_thr_max = 0.6
-        print(f'iou_thr_max: {iou_thr_max}')
-        
-        score_threshold = 0.05
-        map_score, Fscore = evaluate(prediction, score_threshold = score_threshold, iou_thr_max=iou_thr_max)
-        print(f'score_threshold: {score_threshold}')
-        print(f'map_score: {map_score}')
-        print(f'Fscore: {Fscore}')
-        print('________________')
 
-        for i_tresh in [0.01, 0.05, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7]:
+        for i_tresh in [0.05, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7]:
             score_threshold = i_tresh
             map_score, Fscore = evaluate(prediction, score_threshold = score_threshold)
             print(f'score_threshold: {score_threshold}')
@@ -480,6 +676,7 @@ def get_metric_one_epoch(epoch_num, valid_data_loader, best_val, last_val, metri
             print()
         return
         
+    
  
     map_score, Fscore = evaluate(prediction)
             
@@ -492,15 +689,15 @@ def get_metric_one_epoch(epoch_num, valid_data_loader, best_val, last_val, metri
     et = time.time()
     print("\n Total Time - {}\n".format(int(et - st)))
     
-    if best_val > last_val:
-        best_val = last_val
+    if best_val >  np.mean(epoch_loss):
+        best_val = np.mean(epoch_loss)
         torch.save(retinanet, f"{path_to_save}.pt")
         metrics = [np.mean(precision_list), np.mean(recall_list), np.mean(f1_list), epoch_num]
         print('SAVE PT')
     if epoch_num >= epochs - 1:
         torch.save(retinanet, f"{path_to_save}_last.pt")
         
-    return map_score, Fscore, best_val, metrics
+    return np.mean(epoch_loss), map_score, Fscore, best_val, metrics
     
 best_val = 100
 
@@ -509,16 +706,18 @@ last_metricsc = [0,0,0, 0]
 for epoch in range(epochs):
     st = time.time()
 
-    mean_loss_train = train_one_epoch(epoch, dali_iterator_train)
+    mean_loss_train = train_one_epoch(epoch, train_iterator_pipe)
     
-    mean_loss_val = valid_one_epoch(epoch, dali_iterator_val)
+    # mean_loss_val = valid_one_epoch(epoch, dali_iterator_val)
 
-    map_score, Fscore, best_val, last_metricsc = get_metric_one_epoch(epoch, dali_iterator_val, best_val, mean_loss_val, last_metricsc)
+    mean_loss_val, map_score, Fscore, best_val, last_metricsc = get_metric_one_epoch(epoch, dali_iterator_test, best_val, last_metricsc)
     et = time.time()
+    
+    
     
     wandb.log({"epoch": epoch, "train_loss": float(mean_loss_train), "val_loss": float(mean_loss_val), 
                    "map_score": float(map_score), "Fscore": float(Fscore), "total_time":int(et - st)})
     
 print(last_metricsc)
     
-get_metric_one_epoch(0, dali_iterator_test, 0, 0, mode = 'test')
+get_metric_one_epoch(0, dali_iterator_test, 0, last_metricsc, mode = 'test')

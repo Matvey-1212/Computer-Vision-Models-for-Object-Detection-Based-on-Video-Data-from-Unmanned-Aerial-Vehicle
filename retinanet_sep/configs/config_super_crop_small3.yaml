@@ -1,0 +1,55 @@
+model:
+  name: "retinanet_supercrop"
+  id: "903"
+  train_type: "small"
+  fpn: "CustomPyramidFeaturesAT_newlayer"
+  # PyramidFeatures
+  # CustomPyramidFeatures
+  # CustomPyramidFeaturesAT
+  # CustomPyramidFeaturesAT2
+  # CustomPyramidFeaturesR2 
+  # CustomPyramidFeaturesATR2
+  # CustomPyramidFeaturesAT2_newLayer
+  # CustomPyramidFeaturesAT2_newLayer_P2
+  #  PyramidFeaturesP2
+  # CustomPyramidFeaturesAT2_small_newLayer_P2
+  # CustomPyramidFeaturesAT2_small2_newLayer_P2
+  # CustomPyramidFeaturesAT_newlayer
+  custom_resnet: False
+
+  pretrain: False
+  weigh_path: '/home/maantonov_1/VKR/weights/retinanet/resize/test/main/780_8/retinanet_resize_780_8_h:1024_w:1024_last.pt'
+  pretrain_on_ImageNet: True
+  freeze_backbone: False
+  freeze_fpn: False
+
+
+
+training:
+  batch_size: 5
+  num_epochs: 100
+  learning_rate: 0.0001
+  num_steps: 20
+  gamma_coef: 0.5
+  size: 1024
+
+  oan_g: 2
+  oan_a: 0.01
+  bb_pad: 0.5
+  criterion: aploss #aploss, focal
+
+  rotate: False
+
+data:
+  # train_path: '/home/maantonov_1/VKR/data/small_train/train/'
+  # train_annot_path: 'train_annot/annot.json'
+  train_path: '/home/maantonov_1/VKR/data/main_data/train/'
+  train_annot_path: 'main/new_full_annot/only_pos_annot.json'
+
+  valid_path: '/home/maantonov_1/VKR/data/small_train/train/'
+  valid_annot_path: 'val_annot/annot.json'
+
+  double_dataset: False
+  
+
+

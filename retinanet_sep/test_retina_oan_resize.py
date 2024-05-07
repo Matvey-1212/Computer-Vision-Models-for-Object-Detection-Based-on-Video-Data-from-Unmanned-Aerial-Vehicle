@@ -24,7 +24,7 @@ from utils.datasetLADD import LADD
 from utils.dataloader import collater_annot, ToTorch, Augmenter, Normalizer, Resizer
 from utils.Dali_resize import get_dali_pipeline, get_dali_pipeline_aug, flip_bboxes2, flip_bboxes, resize_bb
 from utils.metrics import evaluate
-from retinanet import model_oan
+# from retinanet import model_oan
 from retinanet import losses
 from retinanet.center_utils import make_hm_regr, pool, pred2box, pred2centers, get_true_centers, calculate_accuracy_metrics
 
@@ -36,8 +36,8 @@ from retinanet.center_utils import make_hm_regr, pool, pred2box, pred2centers, g
 
 batch_size = 1
 num_workers = 2
-resize_to = (1312, 1312)
-bb_pad = 0.5
+resize_to = (1024, 1024)
+bb_pad = 0.1
 
 
 
@@ -53,10 +53,11 @@ bb_pad = 0.5
 # path_to_weights = '/home/maantonov_1/VKR/weights/retinanet/resize/test/main/1713683844/retinanet_resize_1713683844_h:1312_w:1312_main.pt'
 
 
-path_to_weights = '/home/maantonov_1/VKR/weights/retinanet/resize/main/2024-03-24/gamma2_alpha0.01/2024-03-24_retinanet_oan_resize_h:1024_w:1024_vis+small+main_lr:0.0003_step:10_gamma:2_alpha:0.01_n29_m:0.31_f:0.46_val:0.1128_last.pt'
-path_to_weights = '/home/maantonov_1/VKR/weights/retinanet/resize/test/main/1713810939/retinanet_resize_1713810939_h:1312_w:1312_main.pt'
+# path_to_weights = '/home/maantonov_1/VKR/weights/retinanet/resize/main/2024-03-24/gamma2_alpha0.01/2024-03-24_retinanet_oan_resize_h:1024_w:1024_vis+small+main_lr:0.0003_step:10_gamma:2_alpha:0.01_n29_m:0.31_f:0.46_val:0.1128_last.pt'
+# path_to_weights = '/home/maantonov_1/VKR/weights/retinanet/resize/test/main/1713810939/retinanet_resize_1713810939_h:1312_w:1312_main.pt'
 
-path_to_weights = '/home/maantonov_1/VKR/weights/retinanet/resize/test/small/557/retinanet_resize_557_h:1024_w:1024_last.pt'
+# path_to_weights = '/home/maantonov_1/VKR/weights/retinanet/resize/test/small/573/retinanet_resize_573_h:1312_w:1312_last.pt'
+path_to_weights = '/home/maantonov_1/VKR/weights/retinanet/resize/test/small/583_8/retinanet_resize_583_8_h:1024_w:1024_last.pt'
 
 
 # main_dir = '/home/maantonov_1/VKR/data/crope_data/main/crop_val_1024/'
@@ -66,7 +67,7 @@ path_to_weights = '/home/maantonov_1/VKR/weights/retinanet/resize/test/small/557
 main_dir = '/home/maantonov_1/VKR/data/main_data/test/'
 images_dir_val = main_dir + 'images'
 # annotations_file_val = main_dir + 'annotations/annot.json'
-annotations_file_val = main_dir + 'true_annotations/annot.json'
+annotations_file_val = main_dir + 'annotations/annot.json'
 
 # main_dir = '/home/maantonov_1/VKR/data/main_data/train/'
 # # main_dir = '/home/maantonov_1/VKR/data/small_train/train/'
@@ -126,14 +127,19 @@ for iter_num, data in enumerate(dali_iterator_val):
         img_id = data[0]['img_id']
         bb_shape = data[0]['bbox_shapes'].cpu()
         original_sizes = data[0]['original_sizes']
-        bbox = resize_bb(bbox, original_sizes, bb_pad = bb_pad, new_shape = resize_to).int()
+        # bbox = resize_bb(bbox, original_sizes, bb_pad = bb_pad, new_shape = resize_to).int()
+        
+        H = float(original_sizes[0][0])
+        W = float(original_sizes[0][1])
         
         new_elements = torch.where(bbox[:, :, 3] == -1, -1, 1).unsqueeze(2)  
         annot = torch.cat((bbox, new_elements), dim=2).cpu()
         
         t = time.time()
-        scores, labels, boxes = retinanet(img)
+        pred = retinanet(img)
         t1 = time.time()
+        
+        scores, labels, boxes = pred[:3]
         
     time_running.append(t1-t)
     print(f'\n    time: {t1-t}')
@@ -142,6 +148,21 @@ for iter_num, data in enumerate(dali_iterator_val):
     scores = scores.cpu().numpy()
     labels = labels.cpu().numpy() * 0
     boxes  = boxes.cpu().numpy() 
+    
+    if len(boxes) != 0:
+        boxes[:,0] = boxes[:,0] * W/resize_to[0]
+        boxes[:,1] = boxes[:,1] * H/resize_to[1]
+        boxes[:,2] = boxes[:,2] * W/resize_to[0]
+        boxes[:,3] = boxes[:,3] * H/resize_to[1]
+        
+        
+        # dx = (boxes[:,2] - boxes[:,0])
+        # dy = boxes[:,3] - boxes[:,1]
+        # boxes[:,0] = boxes[:,0] + dx * 0.25
+        # boxes[:,1] = boxes[:,1] + dy * 0.25
+        # boxes[:,2] = boxes[:,2] - dx * 0.25
+        # boxes[:,3] = boxes[:,3] - dy * 0.25
+    
     pred_dict['scores'] = scores
     pred_dict['labels'] = labels
     pred_dict['boxes']  = boxes

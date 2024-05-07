@@ -60,6 +60,8 @@ bb_pad = 0.5
 
 path_to_weights = '/home/maantonov_1/VKR/weights/retinanet/resize/test/main/1713810939/retinanet_resize_1713810939_h:1312_w:1312_main.pt'
 
+path_to_weights = '/home/maantonov_1/VKR/weights/retinanet/resize/test/main/662/retinanet_resize_662_h:1024_w:1024.pt'
+
 
 # main_dir = '/home/maantonov_1/VKR/data/crope_data/main/crop_val_1024/'
 # main_dir = '/home/maantonov_1/VKR/data/crope_data/small/small_crop_val/'

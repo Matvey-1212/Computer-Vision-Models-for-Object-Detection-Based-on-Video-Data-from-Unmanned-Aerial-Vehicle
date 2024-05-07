@@ -1,0 +1,41 @@
+model:
+  name: "retinanet_supercrop"
+  id: "662"
+  train_type: "main"
+  fpn: "CustomPyramidFeaturesAT2_newLayer"
+  # PyramidFeatures
+  # CustomPyramidFeatures
+  # CustomPyramidFeaturesAT
+  # CustomPyramidFeaturesAT2
+  # CustomPyramidFeaturesR2 
+  # CustomPyramidFeaturesATR2
+  # CustomPyramidFeaturesAT2_newLayer
+  # CustomPyramidFeaturesAT2_newLayer_P2
+  #  PyramidFeaturesP2
+  custom_resnet: False
+
+  pretrain: True
+  weigh_path: '/home/maantonov_1/VKR/weights/retinanet/resize/test/small/557/retinanet_resize_557_h:1024_w:1024_last.pt'
+
+training:
+  batch_size: 4
+  num_epochs: 100
+  learning_rate: 0.0001
+  num_steps: 30
+  gamma_coef: 0.5
+  size: 1024
+
+  oan_g: 2
+  oan_a: 0.05
+  bb_pad: 0.5
+  criterion: aploss #aploss, focal
+
+data:
+  train_path: '/home/maantonov_1/VKR/data/main_data/train/'
+  train_annot_path: 'more_sum_train_annot/annot.json' #more_sum_more_small_less_empty_train_annot
+
+  valid_path: '/home/maantonov_1/VKR/data/main_data/train/'
+  valid_annot_path: 'val_annot/annot.json'
+  
+
+
