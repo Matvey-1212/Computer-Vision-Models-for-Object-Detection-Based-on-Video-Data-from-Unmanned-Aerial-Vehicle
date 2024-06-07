@@ -7,6 +7,7 @@ includes Dice Loss and Weighted Cross Entropy Loss.
 """
 
 import torch
+import torch.nn as nn
 from torch.nn import functional as F
 from torch.autograd import Function
 
@@ -108,14 +109,110 @@ class MSE(torch.nn.Module):
         
         return F.mse_loss(pred, target, reduction='mean')
 
-# def class_weight(target):
-#     weight = torch.zeros(batch_size, H, W)
-#     for i in range(out_channels):
-#         i_t = i * torch.ones([batch_size, H, W], dtype=torch.long)
-#         loc_i = (target == i_t).to(torch.long)
-#         count_i = loc_i.view(out_channels, -1).sum(1)
-#         total = H*W
-#         weight_i = total / count_i
-#         weight_t = loc_i * weight_i.view(-1, 1, 1)
-#         weight += weight_t
-#     return weight
+
+class MSE_CE(torch.nn.Module):
+    """Cross entropy loss that uses weight maps."""
+
+    def __init__(self, alpha = 50, betta = 1):
+        super(MSE_CE, self).__init__()
+        self.alpha = alpha
+        self.betta = betta
+        self.criterion = nn.BCEWithLogitsLoss()
+
+    def forward(self, pred, target):#, weights
+        n, c, H, W = pred.shape
+        
+        p_pred = torch.sigmoid(pred)
+        
+        mse_loss = F.mse_loss(p_pred * 10, target * 10, reduction='mean')
+        
+        ce_loss = self.criterion(pred, target)
+
+        return mse_loss, ce_loss
+    
+class MSE_WCE(torch.nn.Module):
+    """Cross entropy loss that uses weight maps."""
+
+    def __init__(self, w = 10):
+        super(MSE_WCE, self).__init__()
+        self.w = w
+        
+
+    def forward(self, pred, target):#, weights
+        n, c, H, W = pred.shape
+        
+        
+        pos_weight = target * self.w
+        criterion = nn.BCEWithLogitsLoss(pos_weight = pos_weight)
+        
+        p_pred = torch.sigmoid(pred)
+        
+        mse_loss = F.mse_loss(p_pred * 10, target * 10, reduction='mean')
+        
+        ce_loss = criterion(pred, target)
+
+        return mse_loss, ce_loss
+    
+    
+class MSE_WCE_IOU(torch.nn.Module):
+    """Cross entropy loss that uses weight maps."""
+
+    def __init__(self, w = 10):
+        super(MSE_WCE_IOU, self).__init__()
+        self.w = w
+        
+
+    def forward(self, pred, target):#, weights
+        n, c, H, W = pred.shape
+        
+        
+        pos_weight = target * self.w
+        criterion = nn.BCEWithLogitsLoss(pos_weight = pos_weight)
+        
+        p_pred = torch.sigmoid(pred)
+        
+        mse_loss = F.mse_loss(p_pred * 10, target * 10, reduction='mean')
+        
+        ce_loss = criterion(pred, target)
+        
+        eps = 1e-6
+        pred_flat = p_pred.view(-1)
+        target_flat = target.view(-1)
+        
+        intersection = (pred_flat * target_flat).sum()
+        
+        union = pred_flat.sum() + target_flat.sum() - intersection
+        
+        iou = (intersection + eps) / (union + eps)
+
+        return mse_loss, ce_loss, 1 - iou
+
+
+class MSE_IOU(torch.nn.Module):
+    """Cross entropy loss that uses weight maps."""
+
+    def __init__(self, w = 10):
+        super(MSE_IOU, self).__init__()
+        self.w = w
+        
+
+    def forward(self, pred, target):#, weights
+        n, c, H, W = pred.shape
+        
+        
+        p_pred = torch.sigmoid(pred)
+        
+        mse_loss = F.mse_loss(p_pred * 10, target * 10, reduction='mean')
+        
+        
+        eps = 1e-6
+        pred_flat = p_pred.view(-1)
+        target_flat = target.view(-1)
+        
+        intersection = (pred_flat * target_flat).sum()
+        
+        union = pred_flat.sum() + target_flat.sum() - intersection
+        
+        iou = (intersection + eps) / (union + eps)
+
+        return mse_loss, 1 - iou

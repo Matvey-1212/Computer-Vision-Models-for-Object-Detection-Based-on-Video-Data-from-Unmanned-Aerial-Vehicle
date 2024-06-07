@@ -39,7 +39,10 @@ print(f'Crreating retinanet ===>', flush=True)
 
 
 
-path_to_weights = '/home/maantonov_1/VKR/weights/retinanet/10_03_2024/retinanet_oan_vis+small_lr+ful_lr0.0003_step5_gamma2_alpha0.1_12_0.48438382037660715_0.5626141205112599.pt'
+# path_to_weights = '/home/maantonov_1/VKR/weights/retinanet/10_03_2024/retinanet_oan_vis+small_lr+ful_lr0.0003_step5_gamma2_alpha0.1_12_0.48438382037660715_0.5626141205112599.pt'
+# path_to_weights = '/home/maantonov_1/VKR/weights/retinanet/main/2024-03-24/gamma2_alpha0.01/2024-03-24_retinanet_oan_vis+small_lr:0.0003_step:10_gamma:2_alpha:0.01_n24_m:0.56_f:0.48_val:0.1731.pt'
+
+path_to_weights = '/home/maantonov_1/VKR/weights/retinanet/test/main/104/retinanet_oan_104.pt'
 
 retinanet = torch.load(path_to_weights, map_location=device)
 
@@ -114,6 +117,8 @@ for i in range(len(test_dataset)):
 
     prediction.append((gt_dict, pred_dict))
     if i >= 3:
+        print(gt_dict)
+        print(pred_dict)
         break
     
 map_score, Fscore = evaluate(prediction, score_threshold = score_threshold)

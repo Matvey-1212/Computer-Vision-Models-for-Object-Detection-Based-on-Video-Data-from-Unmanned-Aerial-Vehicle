@@ -40,7 +40,16 @@ batch_size = 1
 num_workers = 2
 resize_to = (1024, 1024)
 bb_pad = 0.0
-window_size = 1024
+window_size = 640
+
+conf_level1 = 0.0
+conf_level2 = 0.95
+nms_coef = 0.01
+print(f'resize_to: {resize_to[0]}')
+print(f'window_size: {window_size}')
+print(f'conf_level1: {conf_level1}')
+print(f'conf_level2: {conf_level2}')
+print(f'nms_coef: {nms_coef}')
 
 
 
@@ -49,13 +58,13 @@ window_size = 1024
 path_to_weights1 = '/home/maantonov_1/VKR/weights/retinanet/resize/test/small/583_8/retinanet_resize_583_8_h:1024_w:1024_last.pt'
 # path_to_weights1 = '/home/maantonov_1/VKR/weights/retinanet/resize/test/small/583_9/retinanet_resize_583_9_h:1024_w:1024_last.pt'
 path_to_weights1 = '/home/maantonov_1/VKR/weights/retinanet/resize/test/small/574/retinanet_resize_574_h:1312_w:1312_last.pt'
-path_to_weights1 = '/home/maantonov_1/VKR/weights/retinanet/resize/test/small/902/retinanet_resize_902_h:1024_w:1024.pt'
+# path_to_weights1 = '/home/maantonov_1/VKR/weights/retinanet/resize/test/small/902/retinanet_resize_902_h:1024_w:1024.pt'
 
 path_to_weights2 = '/home/maantonov_1/VKR/weights/faster/main/2024-03-24/2024-03-24_faster_main_lr:0.0003_step:5_n29_m:0.57_f:0.55_val:0.9673.pt'
 # path_to_weights2 = '/home/maantonov_1/VKR/weights/faster/main/2024-05-03/2024-05-03_faster_main_lr:0.0001_step:30.pt'
 # path_to_weights2 = '/home/maantonov_1/VKR/weights/retinanet/test/main/104/retinanet_oan_104.pt'
 # path_to_weights2 = '/home/maantonov_1/VKR/weights/retinanet/test/small/101/retinanet_oan_101_last.pt'
-# weights2 = '/home/maantonov_1/VKR/weights/faster/from_slast/small_model.ckpt'
+
 
 
 
@@ -114,11 +123,13 @@ retinanet = torch.load(path_to_weights1, map_location=device)
 retinanet.to(device)
 retinanet.eval()
 
+
+weights2 = '/home/maantonov_1/VKR/weights/faster/from_slast/small_model.ckpt'
 second_model = torch.load(path_to_weights2, map_location=device)
 
-# weights = torch.load(weights2, map_location=device)
-# print(second_model.load_state_dict(weights, strict=True))
-second_model.roi_heads.nms_thresh = 0.1
+weights = torch.load(weights2, map_location=device)
+print(second_model.load_state_dict(weights, strict=True))
+# second_model.roi_heads.nms_thresh = 0.1
 
 second_model.to(device)
 second_model.eval()
@@ -133,10 +144,10 @@ f1_list = []
 
 for iter_num, data in enumerate(dali_iterator_two_stages):
             
-    print(f'{iter_num} / {len(dali_iterator_two_stages)}', end='')
+    # print(f'{iter_num} / {len(dali_iterator_two_stages)}', end='')
     with torch.no_grad():
         
-        img = data[0]['images']#/255
+        img = data[0]['images']/255
         images_resized = data[0]['images_resized']
         annot = data[0]['bboxes']
         img_id = data[0]['img_id']
@@ -149,13 +160,16 @@ for iter_num, data in enumerate(dali_iterator_two_stages):
         t1 = time.time()
         
         time_running.append(t1-t)
-        print(f'\n    time: {t1-t}')
+        # print(f'\n    time: {t1-t}')
         
         scores, labels, boxes = pred[:3]
         
         
         
-        
+        filer = scores > conf_level1
+        scores = scores[filer]
+        boxes = boxes[filer]
+        labels = labels[filer]
            
         scores = scores.cpu().numpy()
         labels = labels.cpu().numpy() * 0
@@ -163,7 +177,7 @@ for iter_num, data in enumerate(dali_iterator_two_stages):
         
         if len(scores) != 0:
 
-            centers = np.zeros((pred[2].shape[0],2))
+            centers = np.zeros((boxes.shape[0],2))
             centers[:,0] = (boxes[:,2] + boxes[:,0])//2
             centers[:,1] = (boxes[:,3] + boxes[:,1])//2
 
@@ -215,7 +229,13 @@ for iter_num, data in enumerate(dali_iterator_two_stages):
                 # scores = torch.cat((scores, pred[0].cpu()), dim=0)
             
             if len(scores) != 0:
-                keep = nms(boxes, scores, 0.01)
+                
+                filer = scores > conf_level2
+                scores = scores[filer]
+                boxes = boxes[filer]
+                labels = labels[filer]
+                
+                keep = nms(boxes, scores, nms_coef)
             
                 scores = scores[keep].cpu().numpy()
                 labels = labels[keep].cpu().numpy() * 0

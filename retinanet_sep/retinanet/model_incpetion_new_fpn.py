@@ -520,6 +520,144 @@ class CustomPyramidFeaturesAT_newlayer(nn.Module):
              
         return [P2_x, P3_x, P4_x, P5_x]
     
+class CustomPyramidFeatures_inception_concat_p2(nn.Module):
+    def __init__(self, C2_size, C3_size, C4_size, C5_size, layers = [3,4,5,6,7], feature_size=256):
+        super(CustomPyramidFeatures_inception_concat_p2, self).__init__()
+        
+        self.layers = layers
+
+        # upsample C5 to get P5 from the FPN paper
+        self.P5_1_1 = nn.Conv2d(C5_size, feature_size//2, kernel_size=1, stride=1, padding=0)
+        # self.P5_1_3 = nn.Conv2d(C5_size, feature_size//2, kernel_size=3, stride=1, padding=1)
+        
+        self.P5_upsampled = nn.Upsample(scale_factor=2, mode='nearest')
+        self.P5_2 = nn.Conv2d(feature_size//2, feature_size, kernel_size=3, stride=1, padding=1)
+        
+
+        
+        self.P4_1_1 = nn.Conv2d(C4_size, feature_size//2, kernel_size=1, stride=1, padding=0)
+        # self.P4_1_3 = nn.Conv2d(C4_size, feature_size//2, kernel_size=3, stride=1, padding=1)
+        
+        self.P4_12_1 = nn.Conv2d(feature_size, feature_size//2, kernel_size=1, stride=1, padding=0)
+        
+        self.P4_upsampled = nn.Upsample(scale_factor=2, mode='nearest')
+        self.P4_2 = nn.Conv2d(feature_size, feature_size, kernel_size=3, stride=1, padding=1)
+        
+
+        
+        self.P3_1_1 = nn.Conv2d(C3_size, feature_size//2, kernel_size=1, stride=1, padding=0)
+        self.P3_1_3 = nn.Conv2d(C3_size, feature_size//2, kernel_size=3, stride=1, padding=1)
+        
+        self.P3_12_1 = nn.Conv2d(feature_size, feature_size//2, kernel_size=1, stride=1, padding=0)
+
+        self.P3_upsampled = nn.Upsample(scale_factor=2, mode='nearest')
+        self.P3_2 = nn.Conv2d(feature_size, feature_size, kernel_size=3, stride=1, padding=1)
+        
+
+        self.P2_1_1 = nn.Conv2d(C2_size, feature_size//2, kernel_size=1, stride=1, padding=0)
+        self.P2_1_3 = nn.Conv2d(C2_size, feature_size//2, kernel_size=3, stride=1, padding=1)
+
+        self.P2_2 = nn.Conv2d(feature_size, feature_size, kernel_size=3, stride=1, padding=1)
+        
+
+
+    def forward(self, inputs):
+        C2, C3, C4, C5 = inputs
+
+        P5_x = self.P5_1_1(C5) #
+
+        P5_upsampled_x = self.P5_upsampled(P5_x)
+        P5_x = self.P5_2(P5_x)
+
+        P4_x = self.P4_1_1(C4) #
+
+        P4_x = torch.cat((P5_upsampled_x,P4_x),dim=1) #P5_upsampled_x + P4_x
+        P4_upsampled_x = self.P4_12_1(self.P4_upsampled(P4_x))
+        P4_x = self.P4_2(P4_x)
+
+        P3_x = self.P3_1_1(C3) #
+        P3_x = P3_x + self.P3_1_3(C3)
+        P3_x = torch.cat((P4_upsampled_x,P3_x),dim=1) #P3_x + P4_upsampled_x
+        P3_upsampled_x = self.P3_12_1(self.P3_upsampled(P3_x))
+        P3_x = self.P3_2(P3_x)
+
+        P2_x = self.P2_1_1(C2) #
+        P2_x = P2_x + self.P2_1_3(C2)
+        P2_x = torch.cat((P3_upsampled_x,P2_x),dim=1) #P3_x + P4_upsampled_x
+        P2_x = self.P2_2(P2_x)
+        
+             
+        return [P2_x, P3_x, P4_x, P5_x]
+    
+class CustomPyramidFeatures_concat_p2(nn.Module):
+    def __init__(self, C2_size, C3_size, C4_size, C5_size, layers = [3,4,5,6,7], feature_size=256):
+        super(CustomPyramidFeatures_concat_p2, self).__init__()
+        
+        self.layers = layers
+
+        # upsample C5 to get P5 from the FPN paper
+        self.P5_1_1 = nn.Conv2d(C5_size, feature_size//2, kernel_size=1, stride=1, padding=0)
+
+        
+        self.P5_upsampled = nn.Upsample(scale_factor=2, mode='nearest')
+        self.P5_2 = nn.Conv2d(feature_size//2, feature_size, kernel_size=3, stride=1, padding=1)
+        
+
+        
+        self.P4_1_1 = nn.Conv2d(C4_size, feature_size//2, kernel_size=1, stride=1, padding=0)
+
+        
+        self.P4_12_1 = nn.Conv2d(feature_size, feature_size//2, kernel_size=1, stride=1, padding=0)
+        
+        self.P4_upsampled = nn.Upsample(scale_factor=2, mode='nearest')
+        self.P4_2 = nn.Conv2d(feature_size, feature_size, kernel_size=3, stride=1, padding=1)
+        
+
+        
+        self.P3_1_1 = nn.Conv2d(C3_size, feature_size//2, kernel_size=1, stride=1, padding=0)
+
+        
+        self.P3_12_1 = nn.Conv2d(feature_size, feature_size//2, kernel_size=1, stride=1, padding=0)
+
+        self.P3_upsampled = nn.Upsample(scale_factor=2, mode='nearest')
+        self.P3_2 = nn.Conv2d(feature_size, feature_size, kernel_size=3, stride=1, padding=1)
+        
+
+        self.P2_1_1 = nn.Conv2d(C2_size, feature_size//2, kernel_size=1, stride=1, padding=0)
+
+
+        self.P2_2 = nn.Conv2d(feature_size, feature_size, kernel_size=3, stride=1, padding=1)
+        
+
+
+    def forward(self, inputs):
+        C2, C3, C4, C5 = inputs
+
+        P5_x = self.P5_1_1(C5) #
+
+        P5_upsampled_x = self.P5_upsampled(P5_x)
+        P5_x = self.P5_2(P5_x)
+
+        P4_x = self.P4_1_1(C4) #
+
+        P4_x = torch.cat((P5_upsampled_x,P4_x),dim=1) #P5_upsampled_x + P4_x
+        P4_upsampled_x = self.P4_12_1(self.P4_upsampled(P4_x))
+        P4_x = self.P4_2(P4_x)
+
+        P3_x = self.P3_1_1(C3) #
+
+        P3_x = torch.cat((P4_upsampled_x,P3_x),dim=1) #P3_x + P4_upsampled_x
+        P3_upsampled_x = self.P3_12_1(self.P3_upsampled(P3_x))
+        P3_x = self.P3_2(P3_x)
+
+        P2_x = self.P2_1_1(C2) #
+
+        P2_x = torch.cat((P3_upsampled_x,P2_x),dim=1) #P3_x + P4_upsampled_x
+        P2_x = self.P2_2(P2_x)
+        
+             
+        return [P2_x, P3_x, P4_x, P5_x]
+    
 class CustomPyramidFeaturesAT2_newLayer_P2(nn.Module):
     def __init__(self, C2_size, C3_size, C4_size, C5_size, layers = [3,4,5,6,7], feature_size=256):
         super(CustomPyramidFeaturesAT2_newLayer_P2, self).__init__()
@@ -592,6 +730,73 @@ class CustomPyramidFeaturesAT2_newLayer_P2(nn.Module):
         P2_x = self.P2_1_1(C2) #
         P2_x = P2_x + self.P2_1_3(C2) 
         P2_x = P2_x + self.P2_1_5(C2) 
+        P2_x = self.Att2(g=P3_upsampled_x, x=P2_x)
+        P2_x = torch.cat((P3_upsampled_x,P2_x),dim=1) #P3_x + P4_upsampled_x
+        P2_x = self.P2_2(P2_x)
+        
+             
+        return [P2_x, P3_x, P4_x, P5_x]
+    
+class CustomPyramidFeaturesAT2_P2(nn.Module):
+    def __init__(self, C2_size, C3_size, C4_size, C5_size, layers = [3,4,5,6,7], feature_size=256):
+        super(CustomPyramidFeaturesAT2_P2, self).__init__()
+        
+        self.layers = layers
+
+        # upsample C5 to get P5 from the FPN paper
+        self.P5_1_1 = nn.Conv2d(C5_size, feature_size//2, kernel_size=1, stride=1, padding=0)
+        
+        self.P5_upsampled = nn.Upsample(scale_factor=2, mode='nearest')
+        self.P5_2 = nn.Conv2d(feature_size//2, feature_size, kernel_size=3, stride=1, padding=1)
+        
+
+        
+        self.P4_1_1 = nn.Conv2d(C4_size, feature_size//2, kernel_size=1, stride=1, padding=0)
+        self.Att4 = Attention_block(F_g=128,F_l=128,F_int=128)
+
+        self.P4_upsampled = nn.Upsample(scale_factor=2, mode='nearest')
+        self.P4_2 = nn.Conv2d(feature_size, feature_size, kernel_size=3, stride=1, padding=1)
+        
+
+        
+        self.P3_1_1 = nn.Conv2d(C3_size, feature_size, kernel_size=1, stride=1, padding=0)
+        self.Att3 = Attention_block(F_g=256,F_l=256,F_int=256)
+
+        self.P3_upsampled = nn.Upsample(scale_factor=2, mode='nearest')
+        self.P3_2 = nn.Conv2d(feature_size*2, feature_size, kernel_size=3, stride=1, padding=1)
+        
+
+        self.P2_1_1 = nn.Conv2d(C2_size, feature_size * 2, kernel_size=1, stride=1, padding=0)
+        self.Att2 = Attention_block(F_g=256 * 2,F_l=256 * 2,F_int=256 * 2)
+
+        self.P2_2 = nn.Conv2d(feature_size*4, feature_size, kernel_size=3, stride=1, padding=1)
+        
+
+
+    def forward(self, inputs):
+        C2, C3, C4, C5 = inputs
+
+        P5_x = self.P5_1_1(C5) #
+
+        P5_upsampled_x = self.P5_upsampled(P5_x)
+        P5_x = self.P5_2(P5_x)
+
+        P4_x = self.P4_1_1(C4) #
+
+        P4_x = self.Att4(g=P5_upsampled_x, x=P4_x)
+        P4_x = torch.cat((P5_upsampled_x,P4_x),dim=1) #P5_upsampled_x + P4_x
+        P4_upsampled_x = self.P4_upsampled(P4_x)
+        P4_x = self.P4_2(P4_x)
+
+        P3_x = self.P3_1_1(C3) #
+
+        P3_x = self.Att3(g=P4_upsampled_x, x=P3_x)
+        P3_x = torch.cat((P4_upsampled_x,P3_x),dim=1) #P3_x + P4_upsampled_x
+        P3_upsampled_x = self.P3_upsampled(P3_x)
+        P3_x = self.P3_2(P3_x)
+
+        P2_x = self.P2_1_1(C2) #
+
         P2_x = self.Att2(g=P3_upsampled_x, x=P2_x)
         P2_x = torch.cat((P3_upsampled_x,P2_x),dim=1) #P3_x + P4_upsampled_x
         P2_x = self.P2_2(P2_x)
@@ -734,6 +939,69 @@ class CustomPyramidFeaturesAT(nn.Module):
 
         
         return [P3_x, P4_x, P5_x, P6_x, P7_x]
+    
+class CustomPyramidFeaturesP2(nn.Module):
+    def __init__(self, C2_size, C3_size, C4_size, C5_size, layers = [3,4,5,6,7], feature_size=256):
+        super(CustomPyramidFeaturesP2, self).__init__()
+        
+        self.layers = layers
+
+        # upsample C5 to get P5 from the FPN paper
+        self.P5_1_1 = nn.Conv2d(C5_size, feature_size, kernel_size=1, stride=1, padding=0)
+        self.P5_1_3 = nn.Conv2d(C5_size, feature_size, kernel_size=3, stride=1, padding=1)
+        self.P5_1_5 = nn.Conv2d(C5_size, feature_size, kernel_size=3, stride=1, padding=2, dilation=2)
+        
+        self.P5_upsampled = nn.Upsample(scale_factor=2, mode='nearest')
+        self.P5_2 = nn.Conv2d(feature_size, feature_size, kernel_size=3, stride=1, padding=1)
+
+        # add P5 elementwise to C4
+        self.P4_1_1 = nn.Conv2d(C4_size, feature_size, kernel_size=1, stride=1, padding=0)
+        self.P4_1_3 = nn.Conv2d(C4_size, feature_size, kernel_size=3, stride=1, padding=1)
+        self.P4_1_5 = nn.Conv2d(C4_size, feature_size, kernel_size=3, stride=1, padding=2, dilation=2)
+        
+        self.P4_upsampled = nn.Upsample(scale_factor=2, mode='nearest')
+        self.P4_2 = nn.Conv2d(feature_size, feature_size, kernel_size=3, stride=1, padding=1)
+
+        # add P4 elementwise to C3
+        self.P3_1_1 = nn.Conv2d(C3_size, feature_size, kernel_size=1, stride=1, padding=0)
+        self.P3_1_3 = nn.Conv2d(C3_size, feature_size, kernel_size=3, stride=1, padding=1)
+        self.P3_1_5 = nn.Conv2d(C3_size, feature_size, kernel_size=3, stride=1, padding=2, dilation=2)
+        
+        self.P3_upsampled = nn.Upsample(scale_factor=2, mode='nearest')
+        self.P3_2 = nn.Conv2d(feature_size, feature_size, kernel_size=3, stride=1, padding=1)
+        
+        self.P2_1_1 = nn.Conv2d(C2_size, feature_size, kernel_size=1, stride=1, padding=0)
+        self.P2_1_3 = nn.Conv2d(C2_size, feature_size, kernel_size=3, stride=1, padding=1)
+        self.P2_1_5 = nn.Conv2d(C2_size, feature_size, kernel_size=3, stride=1, padding=2, dilation=2)
+        
+        self.P2_2 = nn.Conv2d(feature_size, feature_size, kernel_size=3, stride=1, padding=1)
+
+
+
+    def forward(self, inputs):
+        C2, C3, C4, C5 = inputs
+
+        P5_x = self.P5_1_1(C5) + self.P5_1_3(C5) + self.P5_1_5(C5) 
+        P5_upsampled_x = self.P5_upsampled(P5_x)
+        P5_x = self.P5_2(P5_x)
+
+        P4_x = self.P4_1_1(C4) + self.P4_1_3(C4) + self.P4_1_5(C4) 
+        P4_x = P5_upsampled_x + P4_x
+        P4_upsampled_x = self.P4_upsampled(P4_x)
+        P4_x = self.P4_2(P4_x)
+
+        P3_x = self.P3_1_1(C3) + self.P3_1_3(C3) + self.P3_1_5(C3) 
+        P3_x = P3_x + P4_upsampled_x
+        P3_upsampled_x = self.P3_upsampled(P3_x)
+        P3_x = self.P3_2(P3_x)
+
+        P2_x = self.P2_1_1(C2) + self.P2_1_3(C2) + self.P2_1_5(C2)
+        P2_x = P2_x + P3_upsampled_x
+        P2_x = self.P2_2(P2_x)
+   
+
+        
+        return [P2_x, P3_x, P4_x, P5_x]
 
 class CustomPyramidFeatures(nn.Module):
     def __init__(self, C3_size, C4_size, C5_size, layers = [3,4,5,6,7], feature_size=256):

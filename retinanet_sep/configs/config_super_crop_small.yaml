@@ -1,8 +1,8 @@
 model:
   name: "retinanet_supercrop"
-  id: "905"
+  id: "1014"
   train_type: "small"
-  fpn: "CustomPyramidFeaturesAT2_small2_newLayer_P2"
+  fpn: "CustomPyramidFeatures_inception_concat_p2"
   # PyramidFeatures
   # CustomPyramidFeatures
   # CustomPyramidFeaturesAT
@@ -35,8 +35,8 @@ training:
 
   oan_g: 2
   oan_a: 0.01
-  bb_pad: 0.0
-  criterion: focal #aploss, focal
+  bb_pad: 0.1
+  criterion: aploss #aploss, focal
 
   rotate: False
 
@@ -44,10 +44,10 @@ data:
   # train_path: '/home/maantonov_1/VKR/data/small_train/train/'
   # train_annot_path: 'train_annot/annot.json'
   train_path: '/home/maantonov_1/VKR/data/main_data/train/'
-  train_annot_path: 'main/new_full_annot/only_pos_annot.json'
+  train_annot_path: 'small/train_annot/annot.json'
 
-  valid_path: '/home/maantonov_1/VKR/data/small_train/train/'
-  valid_annot_path: 'val_annot/annot.json'
+  valid_path: '/home/maantonov_1/VKR/data/main_data/train/'
+  valid_annot_path: 'small/val_annot/annot.json'
 
   double_dataset: False
   

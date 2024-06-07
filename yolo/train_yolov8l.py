@@ -10,11 +10,12 @@ model = YOLO('/home/maantonov_1/VKR/weights/yolov8_visdrone/yolov8l.pt')
  
 # Training.
 results = model.train(
-   data='/home/maantonov_1/VKR/actual_scripts/yolo/data_conf/data_conf.yml',
-   imgsz=640,
-   epochs=150,
-   batch=32,
-   name='yolov8l',
+   # data='/home/maantonov_1/VKR/actual_scripts/yolo/data_conf/data_conf.yml',
+   data='/home/maantonov_1/VKR/actual_scripts/yolo/data_conf/data_conf_big.yml',
+   imgsz=2048,
+   epochs=100,
+   batch=4,
+   name='yolov8l_vis2048',
    device='0',
    task= 'detect', # (str) YOLO task, i.e. detect, segment, classify, pose
    mode= 'train',

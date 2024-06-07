@@ -1,0 +1,18 @@
+#!/bin/bash
+#SBATCH --job-name=train_retina_oan_resize_dali_supercrop              # Название задачи
+#SBATCH --error=train_retina_oan_resize_dali_supercrop-%j.err          # Файл для вывода ошибок
+#SBATCH --output=train_retina_oan_resize_dali_supercrop-%j.log         # Файл для вывода результатов
+#SBATCH --time=20:00:00              # Максимальное время выполнения
+#SBATCH --ntasks=1                   # Количество MPI процессов
+#SBATCH --nodes=1                    # Требуемое кол-во узлов
+#SBATCH --cpus-per-task=1       # Количество ядер CPU, выделенных для одного процесса
+#SBATCH --gpus 1                     # Требуемое кол-во GPU
+# --constraint="type_e"
+#SBATCH -A proj_1513
+
+module purge
+module load Python
+source deactivate
+source activate retinanet
+
+python -u train_retina_oan_resize_dali_supercrop.py /home/maantonov_1/VKR/actual_scripts/retinanet_sep/configs/config_super_crop_main5.yaml

@@ -33,6 +33,23 @@ class EfficientDetBackbone(nn.Module):
             7: [72, 200, 576],
             8: [80, 224, 640],
         }
+        
+        self.oan_layer1 = nn.Conv2d(in_channels=448,  
+                                    out_channels=256,  
+                                    kernel_size=3,     
+                                    stride=2,          
+                                    padding=1) 
+        
+        self.oan_layer2 = nn.Conv2d(in_channels=256, 
+                                    out_channels=512,  
+                                    kernel_size=1,     
+                                    stride=1,          
+                                    padding=0) 
+        self.oan_layer3 = nn.Conv2d(in_channels=512,  
+                                    out_channels=1,  
+                                    kernel_size=1,     
+                                    stride=1,          
+                                    padding=0) 
 
         num_anchors = len(self.aspect_ratios) * self.num_scales
 
@@ -68,6 +85,10 @@ class EfficientDetBackbone(nn.Module):
         max_size = inputs.shape[-1]
 
         _, p3, p4, p5 = self.backbone_net(inputs)
+        
+        x_oan = self.oan_layer1(p5)
+        x_oan = self.oan_layer2(x_oan)
+        x_oan = self.oan_layer3(x_oan)
 
         features = (p3, p4, p5)
         features = self.bifpn(features)
@@ -76,7 +97,7 @@ class EfficientDetBackbone(nn.Module):
         classification = self.classifier(features)
         anchors = self.anchors(inputs, inputs.dtype)
 
-        return features, regression, classification, anchors
+        return features, regression, classification, anchors, x_oan
 
     def init_backbone(self, path):
         state_dict = torch.load(path)

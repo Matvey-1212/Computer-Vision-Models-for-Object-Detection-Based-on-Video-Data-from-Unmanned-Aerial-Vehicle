@@ -378,9 +378,9 @@ def get_dali_pipeline_two_stages(images_dir, annotations_file, resize_dims=(1024
 
 
 
-    images = fn.crop_mirror_normalize(images,
-                                      mean=mean,
-                                      std=std, device='gpu')
+    images = fn.crop_mirror_normalize(images,)
+                                    #   mean=mean,
+                                    #   std=std, device='gpu')
     
     images_resized = fn.crop_mirror_normalize(images_resized,
                                       mean=mean,

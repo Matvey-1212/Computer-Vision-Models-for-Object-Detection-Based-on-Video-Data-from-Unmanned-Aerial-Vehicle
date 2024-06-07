@@ -7,6 +7,20 @@ import time
 import cv2
 import numpy as np
 import torch
+import albumentations as A
+
+transform_90 = A.Compose([
+    A.Rotate(limit=[90, 90], p=1.0)
+], bbox_params=A.BboxParams(format='pascal_voc', label_fields=['class_labels']))
+
+transform_270 = A.Compose([
+    A.Rotate(limit=[-90, -90], p=1.0)
+], bbox_params=A.BboxParams(format='pascal_voc', label_fields=['class_labels']))
+
+mean=[0.485 * 255, 0.456 * 255, 0.406 * 255]
+std=[0.229 * 255, 0.224 * 255, 0.225 * 255]
+
+
 
 def flip_bboxes(bb, h_flip, v_flip, shapes, img_size = (1024, 1024)):
     for i in range(bb.shape[0]):
@@ -83,6 +97,32 @@ def visualize_and_save_images_cv2(images_tensor, bboxes_tensor, save_dir):
         cv2.imwrite(os.path.join(save_dir, f'image_{i}_{z[i][0]}.jpg'), image)
         print(f'image_{i}_{z[i][0]}.jpg')
 
+
+def rotate_bboxes2(bb, rotate, shapes, img_size = (1024, 1024)):
+    
+    h, w = img_size
+    for i in range(bb.shape[0]):
+        if float(shapes[i][0]) == 0:
+            continue
+        bb_t = torch.clone(bb[i, :shapes[i][0]])
+        
+        if rotate[i] == 0:
+            continue
+        
+        if rotate[i] == 90:
+            transformed = transform_90(image=np.zeros((h,w)),bboxes=bb_t, class_labels=np.zeros(shapes[i][0]))
+            transformed_bboxes = transformed['bboxes']
+            
+        elif rotate[i] == -90:
+            transformed = transform_270(image=np.zeros((h,w)),bboxes=bb_t, class_labels=np.zeros(shapes[i][0]))
+            transformed_bboxes = transformed['bboxes']
+            
+        # print(torch.tensor(transformed_bboxes).shape)
+        # print(shapes[i][0])
+        bb[i, :shapes[i][0]] = torch.tensor(transformed_bboxes)
+    
+    return bb
+
 @pipeline_def( device_id=0)
 def get_dali_pipeline_aug(images_dir, annotations_file):
     inputs, bboxes, labels, img_id = fn.readers.coco(
@@ -126,13 +166,16 @@ def get_dali_pipeline_aug(images_dir, annotations_file):
     images = fn.flip(images, horizontal=horizontal_flip, vertical=vertical_flip, device='gpu')
     # bboxes = fn.bb_flip(bboxes, horizontal=horizontal_flip, vertical=vertical_flip, ltrb=True)
     
+    angles = fn.random.uniform(values=[0, 90, -90])  # Выбор из 0, 90, -90 градусов
+    images = fn.rotate(images, angle=angles, keep_size=True)
+    
     bbox_shapes = fn.shapes(bboxes)
     bboxes = fn.pad(bboxes, fill_value=-1, axes=(0,1), shape=(60,4))
 
-    images = fn.crop_mirror_normalize(images,
-                                      mean=[0.485 * 255, 0.456 * 255, 0.406 * 255],
-                                      std=[0.229 * 255, 0.224 * 255, 0.225 * 255], device='gpu')
-    return images, bboxes, bbox_shapes, img_id, horizontal_flip, vertical_flip
+    images = fn.crop_mirror_normalize(images,)
+                                    #   mean=[0.485 * 255, 0.456 * 255, 0.406 * 255],
+                                    #   std=[0.229 * 255, 0.224 * 255, 0.225 * 255], device='gpu')
+    return images, bboxes, bbox_shapes, img_id, horizontal_flip, vertical_flip, angles
 
 
 @pipeline_def( device_id=0)
@@ -158,9 +201,9 @@ def get_dali_pipeline(images_dir, annotations_file):
     # self.mean = np.array([[[0.485, 0.456, 0.406]]])
     # self.std = np.array([[[0.229, 0.224, 0.225]]])
 
-    images = fn.crop_mirror_normalize(images,
-                                      mean=[0.485 * 255, 0.456 * 255, 0.406 * 255],
-                                      std=[0.229 * 255, 0.224 * 255, 0.225 * 255],)
+    images = fn.crop_mirror_normalize(images,)
+                                    #   mean=[0.485 * 255, 0.456 * 255, 0.406 * 255],
+                                    #   std=[0.229 * 255, 0.224 * 255, 0.225 * 255],)
     
     return images, bboxes, bbox_shapes, img_id
 

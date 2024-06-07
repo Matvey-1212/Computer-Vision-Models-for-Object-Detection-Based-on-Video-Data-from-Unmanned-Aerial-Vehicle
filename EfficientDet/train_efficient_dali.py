@@ -28,21 +28,23 @@ from backbone import EfficientDetBackbone
 from efficientdet.loss import FocalLoss
 from efficientdet.utils import BBoxTransform, ClipBoxes
 from utils.utils import  postprocess
+from losses import OANFocalLoss
+import aploss
 
 # import torch.autograd
 # torch.autograd.set_detect_anomaly(True)
 
 
 
-epochs = 10
+epochs = 100
 batch_size = 4
 num_workers = 2
 oan_gamma = 2
-oan_alpha = 0.01
+oan_alpha = 0.25
 
 #optimazer
-start_lr   = 0.0003
-num_steps  = 10
+start_lr   = 0.0005
+num_steps  = 25
 gamma_coef = 0.5
 
 print(f'epochs {epochs}')
@@ -54,9 +56,9 @@ print(f'start_lr {start_lr}')
 print(f'num_steps {num_steps}')
 print(f'gamma_coef {gamma_coef}')
 
-weights_name = f'{datetime.date.today().isoformat()}_efficient_oan_vis+small_lr:{start_lr}_step:{num_steps}_gamma:{oan_gamma}_alpha:{oan_alpha}'
+weights_name = f'{datetime.date.today().isoformat()}_efficient_small+main_lr:{start_lr}_step:{num_steps}_gamma:{oan_gamma}_alpha:{oan_alpha}'
 
-path_to_save = f'/home/maantonov_1/VKR/weights/efficient/small/{datetime.date.today().isoformat()}/gamma{oan_gamma}_alpha{oan_alpha}/'
+path_to_save = f'/home/maantonov_1/VKR/weights/efficient/main/{datetime.date.today().isoformat()}/gamma{oan_gamma}_alpha{oan_alpha}/'
 if not os.path.exists(path_to_save):
     os.makedirs(path_to_save)
 path_to_save = path_to_save + weights_name
@@ -64,7 +66,7 @@ path_to_save = path_to_save + weights_name
 print(f'path_to_save {path_to_save}')
 
 
-# path_to_weights = '/home/maantonov_1/VKR/weights/efficient/visdrone/retinanet_oan_vis_lr0.0003_step_5_gamma:2_alpha:0.25_n29_m:0.00_f:0.02_last.pt'
+path_to_weights = '/home/maantonov_1/VKR/weights/efficient/small/2024-03-24/gamma2_alpha0.01/2024-03-24_efficient_small_lr:0.0001_step:10_gamma:2_alpha:0.01_n11_m:0.13_f:0.23_val:2.2380.pt'
 
 os.environ["WANDB_MODE"]="offline" 
 wandb.init(project="VKR", entity="matvey_antonov", name = f"{weights_name}")
@@ -115,11 +117,18 @@ anchors_ratios = [(1.0, 1.0), (1.4, 0.7), (0.7, 1.4)]
 
 model = EfficientDetBackbone(num_classes=2, compound_coef= 4,
                                  ratios=anchors_ratios, scales=anchors_scales)
+
+model.load_state_dict(torch.load(path_to_weights, map_location=device).state_dict(), strict=False)
+
+
 criterion = FocalLoss(gamma = oan_gamma, alpha = oan_alpha)
+criterion = aploss.APLoss.apply
 
-optimizer = optim.Adam(model.parameters(), lr = start_lr)
-lr_scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size = num_steps, gamma=gamma_coef)
+optimizer = optim.AdamW(model.parameters(), lr = start_lr)
+# lr_scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size = num_steps, gamma=gamma_coef)
+lr_scheduler = torch.optim.lr_scheduler.MultiStepLR(optimizer, milestones=[10,25,35,45,55,70, 90], gamma=gamma_coef)
 
+oan_criterion = OANFocalLoss(alpha = oan_alpha, gamma = oan_gamma)
 
 model.to(device)
 
@@ -169,14 +178,15 @@ def train_one_epoch(epoch_num, train_data_loader):
         annot = torch.cat((bbox, new_elements), dim=2).to(device)
         
         
-        features, regression, classification, anchors = model(img)
+        features, regression, classification, anchors, x_oan = model(img)
 
         cls_loss, reg_loss = criterion(classification, regression, anchors, annot)
+        oan_loss = oan_criterion(x_oan, annot)
 
         cls_loss = cls_loss.mean()
         reg_loss = reg_loss.mean()
                 
-        loss = cls_loss + reg_loss
+        loss = cls_loss + reg_loss + 4 * oan_loss
         if loss == 0 or not torch.isfinite(loss):
             print(f'Zero Loss')
             continue
@@ -186,10 +196,10 @@ def train_one_epoch(epoch_num, train_data_loader):
         optimizer.step()
         epoch_loss.append(float(loss))
 
-            
-        print(
-            'Epoch: {} | Iteration: {} | Classification loss: {:1.5f} | Regression loss: {:1.5f}  | Running loss: {:1.5f}'.format(
-                epoch_num, iter_num, float(cls_loss), float(reg_loss),  np.mean(epoch_loss)), flush=True)
+        if iter_num % 10 == 0:    
+            print(
+                'Epoch: {} | Iteration: {} | Classification loss: {:1.5f} | Regression loss: {:1.5f} | oan loss: {:1.5f}  | Running loss: {:1.5f}'.format(
+                    epoch_num, iter_num, float(cls_loss), float(reg_loss), float(oan_loss),  np.mean(epoch_loss)), flush=True)
 
 
         
@@ -224,9 +234,10 @@ def valid_one_epoch(epoch_num, valid_data_loader, best_val):
             annot = torch.cat((bbox, new_elements), dim=2).to(device)
             
             t = time.time()
-            features, regression, classification, anchors = model(img)
+            features, regression, classification, anchors, x_oan = model(img)
             t1 = time.time()
             cls_loss, reg_loss = criterion(classification, regression, anchors, annot)
+            oan_loss = oan_criterion(x_oan, annot)
             t2 = time.time()
             regressBoxes = BBoxTransform()
             clipBoxes = ClipBoxes()
@@ -238,14 +249,15 @@ def valid_one_epoch(epoch_num, valid_data_loader, best_val):
 
             cls_loss = cls_loss.mean()
             reg_loss = reg_loss.mean()
-            loss = cls_loss + reg_loss
+            loss = cls_loss + reg_loss + 4 * oan_loss
             epoch_loss.append(float(loss))
-
-            print(
-            'Epoch: {} | Iteration: {} | Classification loss: {:1.5f} | Regression loss: {:1.5f}  | Running loss: {:1.5f}'.format(
-                epoch_num, iter_num, float(cls_loss), float(reg_loss),  np.mean(epoch_loss)), end = ' ', flush=True)
             
-            print(f'predict: {t1 - t}ms, nms: {t3 - t2}')
+            if iter_num % 10 == 0:
+                print(
+                'Epoch: {} | Iteration: {} | Classification loss: {:1.5f} | Regression loss: {:1.5f} | oan loss: {:1.5f}  | Running loss: {:1.5f}'.format(
+                    epoch_num, iter_num, float(cls_loss), float(reg_loss), float(oan_loss), np.mean(epoch_loss)), end = ' ', flush=True)
+                
+                print(f'predict: {t1 - t}ms, nms: {t3 - t2}')
             
         
         pred_dict = dict_list_to_dict(pred_dict)
@@ -280,11 +292,12 @@ def valid_one_epoch(epoch_num, valid_data_loader, best_val):
     et = time.time()
     print("\n Total Time - {}\n".format(int(et - st)))
     
-    # if best_val > np.mean(epoch_loss):
-    #     best_val = np.mean(epoch_loss)
-    #     torch.save(model, f"{path_to_save}_n{epoch_num}_m:{map_score:0.2f}_f:{Fscore:0.2f}_val:{best_val:0.4f}.pt")
-    # elif epoch_num >= epochs - 1:
-    #     torch.save(model, f"{path_to_save}_n{epoch_num}_m:{map_score:0.2f}_f:{Fscore:0.2f}_val:{np.mean(epoch_loss):0.4f}_last.pt")
+    if best_val > np.mean(epoch_loss):
+        best_val = np.mean(epoch_loss)
+        torch.save(model, f"{path_to_save}.pt")
+        print('SAVE PT')
+    elif epoch_num >= epochs - 1:
+        torch.save(model, f"{path_to_save}_n{epoch_num}_m:{map_score:0.2f}_f:{Fscore:0.2f}_val:{np.mean(epoch_loss):0.4f}_last.pt")
         
     return map_score, Fscore, np.mean(epoch_loss), best_val
     

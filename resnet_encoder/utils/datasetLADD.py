@@ -14,6 +14,7 @@ class LADD(Dataset):
                  from_255_to_1 = True,
                  gaus = False, 
                  small_class_mask = False, 
+                 small_mask_coef = 64,
                  class_mask = False,  
                  smart_crop = False, 
                  new_shape = (640, 640),
@@ -47,7 +48,7 @@ class LADD(Dataset):
         self.small_class_mask = small_class_mask
         self.from_255_to_1 = from_255_to_1
         self.img_endwith = img_endwith
-
+        self.small_mask_coef = small_mask_coef
     
     def gaus_mask(self, img, annot):
         height, width, _ = img.shape
@@ -98,9 +99,9 @@ class LADD(Dataset):
         target_map = np.zeros((int(height//coef), int(width//coef)))#, 2
         # target_map[:,:,0] = 1
         
-        if height % 64 != 0 or width % 64 != 0:
-            pad_w = 64 - height%64
-            pad_h = 64 - width%64
+        if height % coef != 0 or width % coef != 0:
+            pad_w = coef - height%coef
+            pad_h = coef - width%coef
             new_image = np.zeros((height + pad_w, width + pad_h, cns)).astype(np.float32)
             new_image[:height, :width, :] = img.astype(np.float32)
             img = new_image
@@ -266,7 +267,6 @@ class LADD(Dataset):
             image_lab = self.data_format_min_max_one_lab(image_lab)
 
             image, boxes = self.random_crop_with_bbox(image, image_lab, boxes, self.new_shape, teshold=0.4, format = self.data_format)
-
         
         if self.gaus:
             gaus_mask = self.gaus_mask(image, boxes)
@@ -275,7 +275,7 @@ class LADD(Dataset):
             class_mask = self.create_class_mask(image, boxes)
             sample = {'img': image, 'mask': class_mask, 'annot':boxes} 
         elif self.small_class_mask:
-            class_mask, image = self.create_small_class_mask(image, boxes)
+            class_mask, image = self.create_small_class_mask(image, boxes, self.small_mask_coef)
             sample = {'img': image, 'mask': class_mask, 'annot':boxes} 
         else:
             sample = {'img': image, 'annot':boxes}

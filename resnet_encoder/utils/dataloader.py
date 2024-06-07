@@ -218,7 +218,8 @@ class Resizer(object):
         new_image = np.zeros((rows + pad_w, cols + pad_h, cns)).astype(np.float32)
         new_image[:rows, :cols, :] = image.astype(np.float32)
         
-        # annots[:, :4] *= scale
+        if annots.shape[0] != 0:
+            annots[:, :4] *= scale
         
         sample['img']   = torch.from_numpy(new_image)
         sample['annot'] = torch.from_numpy(annots)
@@ -249,6 +250,7 @@ class ToTorch(object):
         
         sample['img'] = torch.from_numpy(image.copy())
         sample['annot'] = torch.from_numpy(annots.copy())
+        sample['scale'] = 1
         if 'mask' in sample:
             mask = sample['mask']
             sample['mask'] = torch.from_numpy(mask.copy())

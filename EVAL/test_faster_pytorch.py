@@ -57,7 +57,8 @@ print('CUDA available: {}'.format(torch.cuda.is_available()), flush=True)
 print(f'Crreating retinanet ===>', flush=True)
 
 
-path_to_weights = '/home/maantonov_1/VKR/weights/faster_main/2024-03-15/2024-03-15_faster_main_lr:0.0003_step:5_n13_m:0.53_f:0.34_val:0.0294.pt'
+# path_to_weights = '/home/maantonov_1/VKR/weights/faster/main/2024-03-24/2024-03-24_faster_main_lr:0.0003_step:5_n29_m:0.57_f:0.55_val:0.9673.pt'
+path_to_weights = '/home/maantonov_1/VKR/weights/faster/main/2024-05-03/2024-05-03_faster_main_lr:0.0001_step:30.pt'
 
 model = torch.load(path_to_weights, map_location=device)
 

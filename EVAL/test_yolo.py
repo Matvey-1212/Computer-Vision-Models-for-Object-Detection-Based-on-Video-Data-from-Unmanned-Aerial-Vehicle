@@ -23,7 +23,7 @@ test_dataset = LADD(test_df, mode = "valid", from_255_to_1 = False, smart_crop =
 
 torch.cuda.empty_cache()
 
-model = YOLO('/home/maantonov_1/VKR/actual_scripts/yolo/runs/detect/yolov8m_small_data+main2/weights/best.pt')
+model = YOLO('/home/maantonov_1/VKR/actual_scripts/yolo/runs/detect/yolov8l_vis1024/weights/best.pt')
 
 time_running = []
 prediction = []
@@ -104,10 +104,66 @@ for i in range(len(test_dataset)):
 map_score, Fscore = evaluate(prediction, score_threshold = score_threshold)
 
 print(f'{datetime.date.today().isoformat()}')
-print(f'score_threshold {score_threshold}')
+# print(f'path_to_weights {path_to_weights}')
+print(f'AVG time: {np.mean(time_running)}')
+
+score_threshold = 0.01
+map_score, Fscore = evaluate(prediction, score_threshold = score_threshold)
+print(f'score_threshold: {score_threshold}')
 print(f'map_score: {map_score}')
 print(f'Fscore: {Fscore}')
-print(f'AVG time: {np.mean(time_running)}')
+
+score_threshold = 0.05
+map_score, Fscore = evaluate(prediction, score_threshold = score_threshold)
+print(f'score_threshold: {score_threshold}')
+print(f'map_score: {map_score}')
+print(f'Fscore: {Fscore}')
+
+
+score_threshold = 0.1
+map_score, Fscore = evaluate(prediction, score_threshold = score_threshold)
+print(f'score_threshold: {score_threshold}')
+print(f'map_score: {map_score}')
+print(f'Fscore: {Fscore}')
+
+
+score_threshold = 0.2
+map_score, Fscore = evaluate(prediction, score_threshold = score_threshold)
+print(f'score_threshold: {score_threshold}')
+print(f'map_score: {map_score}')
+print(f'Fscore: {Fscore}')
+
+
+score_threshold = 0.3
+map_score, Fscore = evaluate(prediction, score_threshold = score_threshold)
+print(f'score_threshold: {score_threshold}')
+print(f'map_score: {map_score}')
+print(f'Fscore: {Fscore}')
+
+
+score_threshold = 0.4
+map_score, Fscore = evaluate(prediction, score_threshold = score_threshold)
+print(f'score_threshold: {score_threshold}')
+print(f'map_score: {map_score}')
+print(f'Fscore: {Fscore}')
+
+score_threshold = 0.5
+map_score, Fscore = evaluate(prediction, score_threshold = score_threshold)
+print(f'score_threshold: {score_threshold}')
+print(f'map_score: {map_score}')
+print(f'Fscore: {Fscore}')
+
+score_threshold = 0.6
+map_score, Fscore = evaluate(prediction, score_threshold = score_threshold)
+print(f'score_threshold: {score_threshold}')
+print(f'map_score: {map_score}')
+print(f'Fscore: {Fscore}')
+
+score_threshold = 0.7
+map_score, Fscore = evaluate(prediction, score_threshold = score_threshold)
+print(f'score_threshold: {score_threshold}')
+print(f'map_score: {map_score}')
+print(f'Fscore: {Fscore}')
         
 
     

@@ -40,14 +40,16 @@ batch_size = 1
 num_workers = 2
 resize_to = (1024, 1024)
 bb_pad = 0.0
-window_size = 640
+window_size = 1024
 
-conf_level1 = 0.7
-conf_level2 = 0.9
+conf_level1 = 0.5
+conf_level2 = 0.7
+nms_coef = 0.01
 print(f'resize_to: {resize_to[0]}')
 print(f'window_size: {window_size}')
 print(f'conf_level1: {conf_level1}')
 print(f'conf_level2: {conf_level2}')
+print(f'nms_coef: {nms_coef}')
 
 
 main_dir = '/home/maantonov_1/VKR/data/main_data/test/'
@@ -111,12 +113,13 @@ retinanet.to(device)
 retinanet.eval()
 
 
+# path_to_weights2 = '/home/maantonov_1/VKR/weights/faster/main/2024-05-03/2024-05-03_faster_main_lr:0.0001_step:30.pt'
 path_to_weights2 = '/home/maantonov_1/VKR/weights/faster/main/2024-05-03/2024-05-03_faster_main_lr:0.0001_step:30.pt'
 weights2 = '/home/maantonov_1/VKR/weights/faster/from_slast/small_model.ckpt'
 
 second_model = torch.load(path_to_weights2, map_location=device)
-weights = torch.load(weights2, map_location=device)
-print(second_model.load_state_dict(weights, strict=True))
+# weights = torch.load(weights2, map_location=device)
+# print(second_model.load_state_dict(weights, strict=True))
 
 second_model.to(device)
 second_model.eval()
@@ -219,7 +222,7 @@ for iter_num, data in enumerate(dali_iterator_two_stages):
                 boxes = boxes[filer]
                 labels = labels[filer]
                 
-                keep = nms(boxes, scores, 0.01)
+                keep = nms(boxes, scores, nms_coef)
             
                 scores = scores[keep].cpu().numpy()
                 labels = labels[keep].cpu().numpy() * 0

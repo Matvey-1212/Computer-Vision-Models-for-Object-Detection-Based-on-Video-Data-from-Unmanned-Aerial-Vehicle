@@ -428,6 +428,69 @@ class CustomPyramidFeaturesAT2(nn.Module):
 
         
         return [P3_x, P4_x, P5_x, P6_x, P7_x]
+    
+class CustomPyramidFeaturesConcat(nn.Module):
+    def __init__(self, C3_size, C4_size, C5_size, layers = [3,4,5,6,7], feature_size=256):
+        super(CustomPyramidFeaturesConcat, self).__init__()
+        
+        self.layers = layers
+
+        # upsample C5 to get P5 from the FPN paper
+        self.P5_1_1 = nn.Conv2d(C5_size, feature_size//2, kernel_size=1, stride=1, padding=0)
+
+        
+        self.P5_upsampled = nn.Upsample(scale_factor=2, mode='nearest')
+
+        self.P5_2 = nn.Conv2d(feature_size//2, feature_size, kernel_size=3, stride=1, padding=1)
+
+        # add P5 elementwise to C4
+        self.P4_1_1 = nn.Conv2d(C4_size, feature_size//2, kernel_size=1, stride=1, padding=0)
+
+
+        
+        self.P4_upsampled = nn.Upsample(scale_factor=2, mode='nearest')
+
+        self.P4_2 = nn.Conv2d(feature_size, feature_size, kernel_size=3, stride=1, padding=1)
+
+        # add P4 elementwise to C3
+        self.P3_1_1 = nn.Conv2d(C3_size, feature_size, kernel_size=1, stride=1, padding=0)
+
+
+        
+        self.P3_2 = nn.Conv2d(feature_size * 2, feature_size, kernel_size=3, stride=1, padding=1)
+
+        # "P6 is obtained via a 3x3 stride-2 conv on C5"
+        self.P6 = nn.Conv2d(C5_size, feature_size, kernel_size=3, stride=2, padding=1)
+
+        # "P7 is computed by applying ReLU followed by a 3x3 stride-2 conv on P6"
+        self.P7_1 = nn.ReLU()
+        self.P7_2 = nn.Conv2d(feature_size, feature_size, kernel_size=3, stride=2, padding=1)
+
+
+# torch.cat((x3,d4),dim=1)
+    def forward(self, inputs):
+        C3, C4, C5 = inputs
+
+        P5_x = self.P5_1_1(C5) 
+        P5_upsampled_x = self.P5_upsampled(P5_x)
+        P5_x = self.P5_2(P5_x)
+
+        P4_x = self.P4_1_1(C4) 
+        P4_x = torch.cat((P5_upsampled_x,P4_x),dim=1) #P5_upsampled_x + P4_x
+        P4_upsampled_x = self.P4_upsampled(P4_x)
+        P4_x = self.P4_2(P4_x)
+
+        P3_x = self.P3_1_1(C3)
+        P3_x = torch.cat((P4_upsampled_x,P3_x),dim=1) #P3_x + P4_upsampled_x
+        P3_x = self.P3_2(P3_x)
+
+        P6_x = self.P6(C5)
+
+        P7_x = self.P7_1(P6_x)
+        P7_x = self.P7_2(P7_x)
+
+        
+        return [P3_x, P4_x, P5_x, P6_x, P7_x]
 
 class CustomPyramidFeaturesAT(nn.Module):
     def __init__(self, C3_size, C4_size, C5_size, layers = [3,4,5,6,7], feature_size=256):
@@ -891,7 +954,7 @@ class ResNet(nn.Module):
                 finalAnchorBoxesIndexes = torch.cat((finalAnchorBoxesIndexes, finalAnchorBoxesIndexesValue))
                 finalAnchorBoxesCoordinates = torch.cat((finalAnchorBoxesCoordinates, anchorBoxes[anchors_nms_idx]))
 
-            return [finalScores, finalAnchorBoxesIndexes, finalAnchorBoxesCoordinates]
+            return [finalScores, finalAnchorBoxesIndexes, finalAnchorBoxesCoordinates, classification, regression, anchors]
 
 class OAN_Retinanet(nn.Module):
     

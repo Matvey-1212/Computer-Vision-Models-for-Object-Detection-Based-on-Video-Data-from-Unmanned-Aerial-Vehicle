@@ -33,8 +33,8 @@ from utils.metrics import evaluate
 from retinanet import model_incpetion, model_incpetion_new_fpn
 from retinanet import losses
 from retinanet import aploss
-from retinanet.model_incpetion import PyramidFeatures, CustomPyramidFeatures, CustomPyramidFeaturesAT, CustomPyramidFeaturesAT2, CustomPyramidFeaturesR2, CustomPyramidFeaturesATR2, CustomPyramidFeaturesAT2_newLayer, CustomPyramidFeaturesAT2_newLayer_P2
-from retinanet.model_incpetion_new_fpn import PyramidFeaturesP2, CustomPyramidFeaturesAT2_small_newLayer_P2, CustomPyramidFeaturesAT2_small2_newLayer_P2, CustomPyramidFeaturesAT_newlayer
+from retinanet.model_incpetion import PyramidFeatures, CustomPyramidFeatures, CustomPyramidFeaturesAT, CustomPyramidFeaturesAT2, CustomPyramidFeaturesR2, CustomPyramidFeaturesATR2, CustomPyramidFeaturesAT2_newLayer, CustomPyramidFeaturesAT2_newLayer_P2, CustomPyramidFeaturesConcat
+from retinanet.model_incpetion_new_fpn import PyramidFeaturesP2, CustomPyramidFeaturesAT2_small_newLayer_P2, CustomPyramidFeaturesAT2_small2_newLayer_P2, CustomPyramidFeaturesAT_newlayer, CustomPyramidFeatures_concat_p2, CustomPyramidFeaturesP2, CustomPyramidFeaturesAT2_P2, CustomPyramidFeatures_inception_concat_p2
 from retinanet.center_utils import make_hm_regr, pool, pred2box, pred2centers, get_true_centers, calculate_accuracy_metrics
 from retinanet.anchors import Anchors, AnchorsP2, simpleAnchors
 
@@ -95,40 +95,21 @@ path_to_save = path_to_save + weights_name
 print(f'path_to_save {path_to_save}')
 
 
-# path_to_weights = '/home/maantonov_1/VKR/weights/retinanet/visdrone/retinanet_oan_vis_lr0.0003_step_5_gamma:2_alpha:0.25_n26_m:0.03_f:0.04.pt'
-# path_to_weights = '/home/maantonov_1/VKR/weights/retinanet/resize/test/main/1713810939/retinanet_resize_1713810939_h:1312_w:1312_main.pt'
+
 
 os.environ["WANDB_MODE"]="offline" 
 wandb.init(project="VKR", entity="matvey_antonov", name = f"{weights_name}")
 
 
-# main_dir = '/home/maantonov_1/VKR/data/crope_data/main/crop_train_1024/'
-# main_dir = '/home/maantonov_1/VKR/data/crope_data/small/small_crop_train/'
-# main_dir = '/home/maantonov_1/VKR/data/main_data/train/'
-# main_dir = '/home/maantonov_1/VKR/data/small_train/train/'
-# main_dir = '/home/maantonov_1/VKR/data/main_data/super_crop_1312/'
-
 
 
 main_dir = config['data']['train_path']
 images_dir_tarin = main_dir + 'images'
-# annotations_file_train = main_dir + 'train_annot/annot.json'
-# annotations_file_train = main_dir + 'more_sum_train_annot/annot.json'
-# annotations_file_train = main_dir + 'true_train_annot/annot.json'
-# annotations_file_train = main_dir + 'more_sum_less_empty_train_annot/annot.json'
-
 annot_path = config['data']['train_annot_path']
 annotations_file_train = main_dir + annot_path
 
-# main_dir = '/home/maantonov_1/VKR/data/crope_data/main/crop_val_1024/'
-# main_dir = '/home/maantonov_1/VKR/data/crope_data/small/small_crop_val/'
-# main_dir = '/home/maantonov_1/VKR/data/main_data/train/'
-# main_dir = '/home/maantonov_1/VKR/data/small_train/train/'
-# main_dir = '/home/maantonov_1/VKR/data/main_data/super_crop_1312/'
-
 main_dir = config['data']['valid_path']
 images_dir_val = main_dir + 'images'
-# annotations_file_val = main_dir + 'val_annot/annot.json'
 annot_path = config['data']['valid_annot_path']
 annotations_file_val = main_dir + annot_path
 
@@ -189,14 +170,14 @@ if double_dataset_flag:
         )
     train_iterator_pipe = [dali_iterator_train, dali_iterator_double_train]
 
-# dali_iterator_val = DALIGenericIterator(
-#     pipelines=[get_dali_pipeline(images_dir = images_dir_val, annotations_file = annotations_file_val,resize_dims = resize_to, batch_size = batch_size, num_threads = num_workers)],
-#     output_map=['data', 'bboxe', 'bbox_shapes', 'img_id', 'original_sizes'],
-#     reader_name='Reader',
-#     last_batch_policy=LastBatchPolicy.PARTIAL,
-#     auto_reset=True,
-#     # dynamic_shape=True
-# )
+dali_iterator_val = DALIGenericIterator(
+    pipelines=[get_dali_pipeline(images_dir = images_dir_val, annotations_file = annotations_file_val,resize_dims = resize_to, batch_size = batch_size, num_threads = num_workers)],
+    output_map=['data', 'bboxe', 'bbox_shapes', 'img_id', 'original_sizes'],
+    reader_name='Reader',
+    last_batch_policy=LastBatchPolicy.PARTIAL,
+    auto_reset=True,
+    # dynamic_shape=True
+)
 
 dali_iterator_test = DALIGenericIterator(
     pipelines=[get_dali_pipeline(images_dir = images_dir_test, annotations_file = annotations_file_test, resize_dims = resize_to, batch_size = batch_size, num_threads = num_workers)],
@@ -224,7 +205,9 @@ fpn_type = config['model']['fpn']
 if fpn_type == 'PyramidFeatures':
     fpn = PyramidFeatures
     retinanet = model_incpetion.resnet50(num_classes = 2, pretrained = False, inputs = 3, fpn = fpn)
-
+elif fpn_type == 'CustomPyramidFeaturesConcat':
+    fpn = CustomPyramidFeaturesConcat
+    retinanet = model_incpetion.resnet50(num_classes = 2, pretrained = False, inputs = 3, fpn = fpn)
 elif fpn_type == 'CustomPyramidFeatures':
     fpn = CustomPyramidFeatures
     retinanet = model_incpetion.resnet50(num_classes = 2, pretrained = False, inputs = 3, fpn = fpn)
@@ -258,10 +241,22 @@ elif fpn_type == 'CustomPyramidFeaturesAT2_small2_newLayer_P2':
 elif fpn_type == 'CustomPyramidFeaturesAT_newlayer':
     fpn = CustomPyramidFeaturesAT_newlayer
     retinanet = model_incpetion_new_fpn.resnet50(num_classes = 2, pretrained = False, inputs = 3, fpn = fpn)
+elif fpn_type == 'CustomPyramidFeatures_concat_p2':
+    fpn = CustomPyramidFeatures_concat_p2
+    retinanet = model_incpetion_new_fpn.resnet50(num_classes = 2, pretrained = False, inputs = 3, fpn = fpn)
+elif fpn_type == 'CustomPyramidFeaturesP2':
+    fpn = CustomPyramidFeaturesP2
+    retinanet = model_incpetion_new_fpn.resnet50(num_classes = 2, pretrained = False, inputs = 3, fpn = fpn)
+elif fpn_type == 'CustomPyramidFeaturesAT2_P2':
+    fpn = CustomPyramidFeaturesAT2_P2
+    retinanet = model_incpetion_new_fpn.resnet50(num_classes = 2, pretrained = False, inputs = 3, fpn = fpn)
+elif fpn_type == 'CustomPyramidFeatures_inception_concat_p2':
+    fpn = CustomPyramidFeatures_inception_concat_p2
+    retinanet = model_incpetion_new_fpn.resnet50(num_classes = 2, pretrained = False, inputs = 3, fpn = fpn)
     
+    
+CustomPyramidFeatures_inception_concat_p2
 
-    
-    
     
 print(f'FPN: {fpn_type}')
 
@@ -321,8 +316,8 @@ if config['model']['freeze_backbone']:
 else:
     optimizer = optim.AdamW(retinanet.parameters(), lr = start_lr)
     
-# lr_scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size = num_steps, gamma=gamma_coef)
-lr_scheduler = torch.optim.lr_scheduler.MultiStepLR(optimizer, milestones=[5, 15, 30,80], gamma=gamma_coef)
+lr_scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size = num_steps, gamma=gamma_coef)
+# lr_scheduler = torch.optim.lr_scheduler.MultiStepLR(optimizer, milestones=[5, 15, 30,80], gamma=gamma_coef)
 # scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimizer, patience=7, verbose=True)
 
 retinanet.to(device)
@@ -389,9 +384,9 @@ def train_one_epoch(epoch_num, train_data_loader):
                 
         loss.backward()
 
-        torch.nn.utils.clip_grad_norm_(retinanet.parameters(), max_norm=2.0)
+        torch.nn.utils.clip_grad_norm_(retinanet.parameters(), max_norm=0.5)
         
-        torch.nn.utils.clip_grad_value_(retinanet.parameters(), clip_value=0.5)
+        torch.nn.utils.clip_grad_value_(retinanet.parameters(), clip_value=0.1)
                 
         optimizer.step()
         epoch_loss.append(float(loss))
@@ -710,7 +705,7 @@ for epoch in range(epochs):
     
     # mean_loss_val = valid_one_epoch(epoch, dali_iterator_val)
 
-    mean_loss_val, map_score, Fscore, best_val, last_metricsc = get_metric_one_epoch(epoch, dali_iterator_test, best_val, last_metricsc)
+    mean_loss_val, map_score, Fscore, best_val, last_metricsc = get_metric_one_epoch(epoch, dali_iterator_val, best_val, last_metricsc)
     et = time.time()
     
     

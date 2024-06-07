@@ -7,7 +7,7 @@
 #SBATCH --nodes=1                    # Требуемое кол-во узлов
 #SBATCH --cpus-per-task=2       # Количество ядер CPU, выделенных для одного процесса
 #SBATCH --gpus 1                     # Требуемое кол-во GPU
-#SBATCH -A proj_1466
+#SBATCH -A proj_1513
 
 module purge
 module load Python

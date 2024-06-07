@@ -102,7 +102,7 @@ class ResNet(nn.Module):
                                     stride=1,          
                                     padding=0) 
         self.oan_layer3 = nn.Conv2d(in_channels=512,  
-                                    out_channels=2,  
+                                    out_channels=1,  
                                     kernel_size=1,     
                                     stride=1,          
                                     padding=0) 
@@ -157,6 +157,9 @@ class ResNet(nn.Module):
 
 def OAN(channels=3):
     return ResNet(Bottleneck, [3,4,6,3], channels)
+
+def OAN101(channels=3):
+    return ResNet(Bottleneck, [3, 4, 23, 3], channels)
         
 
 

@@ -26,7 +26,7 @@ test_df = [{'dataframe': pd.read_csv('/home/maantonov_1/VKR/data/main_data/test/
              'image_dir': '/home/maantonov_1/VKR/data/main_data/test/images'}]
 
 
-test_dataset = LADD(test_df, mode = "valid", small_class_mask=True, small_mask_coef = 32, smart_crop = True, new_shape = (1024,1024), transforms = T.Compose([Normalizer(), ToTorch()]))
+test_dataset = LADD(test_df, mode = "valid", small_class_mask=True, small_mask_coef = 32, smart_crop = True, new_shape = (2048,2048), transforms = T.Compose([Normalizer(), ToTorch()]))
 
 
 print(f'dataset Created', flush=True)
