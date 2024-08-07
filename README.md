@@ -36,6 +36,7 @@ Detecting lost persons in sparsely populated areas using high-resolution images 
 
 ## Comparison Table
 
-| Model              | mAP   | mFscore (0.5) | FPS  | Model Size (MB) |
-|--------------------|-------|---------------|------|-----------------|
-| Faster-RCNN        | 0.292 | 0.496         | 7.4  | 158.3           |
+| Модель              | mAP   | mFscore (0.5) | FPS  | Вес модели, Мб |
+|---------------------|-------|---------------|------|-----------------|
+| Faster-RCNN         | 0,292 | 0,496         | 7,4  | 158,3           |
+| RetinaNet+P2+INC+CT | 0,306 | 0,521         | 35,2 | 121,9           |
